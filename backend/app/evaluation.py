@@ -133,7 +133,11 @@ def evaluate_stored(user_id: str | None = None) -> dict:
     """Load stored data for a user and evaluate (used by the API and CLI)."""
     from .analysis import compute_timeline
     from .config import settings
-    from .db import get_assessments, get_entries
+
+    if settings.firestore_enabled:
+        from .firebase_db import get_assessments, get_entries
+    else:
+        from .db import get_assessments, get_entries
 
     uid = user_id or settings.DEFAULT_USER
     timeline = compute_timeline(get_entries(uid))["timeline"]

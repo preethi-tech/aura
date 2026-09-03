@@ -4,27 +4,75 @@ const API = "/api";
 let auraChart = null;
 let signalsChart = null;
 
+// ---- Theme Toggle -----------------------------------------------------------
+function initTheme() {
+  const saved = localStorage.getItem("aura-theme");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const theme = saved || (prefersDark ? "dark" : "light");
+  document.documentElement.setAttribute("data-theme", theme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme");
+  const next = current === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("aura-theme", next);
+  // Redraw charts with new theme colors
+  loadTimeline();
+}
+
+function getThemeColors() {
+  const style = getComputedStyle(document.documentElement);
+  return {
+    text: style.getPropertyValue("--text-secondary").trim(),
+    grid: style.getPropertyValue("--chart-grid").trim(),
+    accent: style.getPropertyValue("--accent").trim(),
+    tier0: style.getPropertyValue("--tier0").trim(),
+    tier1: style.getPropertyValue("--tier1").trim(),
+    tier2: style.getPropertyValue("--tier2").trim(),
+    tier3: style.getPropertyValue("--tier3").trim(),
+  };
+}
+
+// ---- API Helpers ------------------------------------------------------------
+let authToken = null;
+
 async function api(path, opts = {}) {
-  const res = await fetch(API + path, {
-    headers: { "Content-Type": "application/json" },
-    ...opts,
-  });
+  const headers = { "Content-Type": "application/json", ...opts.headers };
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+  const res = await fetch(API + path, { ...opts, headers });
   if (!res.ok) throw new Error(`${path} -> ${res.status}`);
   return res.json();
 }
 
 const TIER_CLASS = { 0: "t0", 1: "t1", 2: "t2", 3: "t3" };
-const TIER_COLORS = ["#4caf82", "#d8c150", "#e0913e", "#e05a5a"];
 
 function colorForIndex(v) {
-  if (v == null) return "#8ea0ab";
-  if (v < 25) return TIER_COLORS[0];
-  if (v < 50) return TIER_COLORS[1];
-  if (v < 75) return TIER_COLORS[2];
-  return TIER_COLORS[3];
+  const c = getThemeColors();
+  if (v == null) return c.text;
+  if (v < 25) return c.tier0;
+  if (v < 50) return c.tier1;
+  if (v < 75) return c.tier2;
+  return c.tier3;
 }
 
-// ---- Status card -----------------------------------------------------------
+// ---- Gauge Animation --------------------------------------------------------
+function updateGauge(value) {
+  const fill = document.getElementById("gaugeFill");
+  const circumference = 2 * Math.PI * 52; // r=52
+  if (value == null) {
+    fill.style.strokeDashoffset = circumference;
+    fill.style.stroke = getThemeColors().text;
+    return;
+  }
+  const offset = circumference - (value / 100) * circumference;
+  fill.style.strokeDashoffset = offset;
+  fill.style.stroke = colorForIndex(value);
+}
+
+// ---- Status Card ------------------------------------------------------------
 async function loadStatus() {
   const s = await api("/status");
   const indexEl = document.getElementById("indexValue");
@@ -36,21 +84,23 @@ async function loadStatus() {
   banner.classList.toggle("hidden", !s.safety_alert);
 
   if (!s.has_data) {
-    indexEl.textContent = "—";
-    indexEl.style.color = "var(--muted)";
+    indexEl.textContent = "--";
+    indexEl.style.color = "var(--text-secondary)";
+    updateGauge(null);
     badge.textContent = "No data yet";
-    badge.className = "tier";
+    badge.className = "tier-badge";
     msg.textContent = "Add a check-in or load the demo timeline to begin.";
-    whyList.innerHTML = '<li class="muted">—</li>';
+    whyList.innerHTML = '<li class="empty-state">--</li>';
     return;
   }
 
-  indexEl.textContent = s.aura_index != null ? s.aura_index : "—";
+  indexEl.textContent = s.aura_index != null ? s.aura_index : "--";
   indexEl.style.color = colorForIndex(s.aura_index);
+  updateGauge(s.aura_index);
 
   let label = s.tier_label + (s.calibrating ? " · calibrating" : "");
   badge.textContent = label;
-  badge.className = "tier " + (TIER_CLASS[s.tier] || "");
+  badge.className = "tier-badge " + (TIER_CLASS[s.tier] || "");
   msg.textContent = s.tier_message || "";
 
   if (s.top_signals && s.top_signals.length) {
@@ -62,7 +112,7 @@ async function loadStatus() {
       .join("");
   } else {
     whyList.innerHTML =
-      '<li class="muted">No signals are meaningfully above your baseline.</li>';
+      '<li class="empty-state">No signals are meaningfully above your baseline.</li>';
   }
 
   const refl = document.getElementById("reflectionBlock");
@@ -75,18 +125,17 @@ async function loadStatus() {
   }
 }
 
-// ---- Charts ----------------------------------------------------------------
+// ---- Charts -----------------------------------------------------------------
 async function loadTimeline() {
   const data = await api("/timeline");
   const t = data.timeline;
-  const labels = t.map((d) => d.date.slice(5)); // MM-DD
+  const labels = t.map((d) => d.date.slice(5));
 
   renderAuraChart(labels, t);
   renderSignalsChart(labels, t);
 
-  document.getElementById(
-    "dataInfo"
-  ).textContent = `${t.length} check-in(s) stored locally.`;
+  document.getElementById("dataInfo").textContent =
+    `${t.length} check-in(s) stored.`;
 }
 
 function threshold(labels, value, color) {
@@ -103,6 +152,7 @@ function threshold(labels, value, color) {
 }
 
 function renderAuraChart(labels, t) {
+  const c = getThemeColors();
   const idx = t.map((d) => d.aura_index);
   const pointColors = idx.map(colorForIndex);
   const ctx = document.getElementById("auraChart");
@@ -115,29 +165,33 @@ function renderAuraChart(labels, t) {
         {
           label: "Aura Index",
           data: idx,
-          borderColor: "#5ac8b0",
-          backgroundColor: "rgba(90,200,176,0.12)",
+          borderColor: c.accent,
+          backgroundColor: c.accent + "18",
           pointBackgroundColor: pointColors,
-          pointRadius: 3,
+          pointRadius: 2.5,
+          borderWidth: 2,
           fill: true,
           tension: 0.3,
         },
-        threshold(labels, 25, "#4caf82"),
-        threshold(labels, 50, "#d8c150"),
-        threshold(labels, 75, "#e05a5a"),
+        threshold(labels, 25, c.tier0),
+        threshold(labels, 50, c.tier1),
+        threshold(labels, 75, c.tier3),
       ],
     },
     options: {
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        y: { min: 0, max: 100, ticks: { color: "#8ea0ab" }, grid: { color: "#26323a" } },
-        x: { ticks: { color: "#8ea0ab", maxTicksLimit: 12 }, grid: { display: false } },
+        y: { min: 0, max: 100, ticks: { color: c.text }, grid: { color: c.grid } },
+        x: { ticks: { color: c.text, maxTicksLimit: 12 }, grid: { display: false } },
       },
     },
   });
 }
 
 function renderSignalsChart(labels, t) {
+  const c = getThemeColors();
   const ctx = document.getElementById("signalsChart");
   if (signalsChart) signalsChart.destroy();
   const mk = (key, color) => ({
@@ -155,28 +209,30 @@ function renderSignalsChart(labels, t) {
     data: {
       labels,
       datasets: [
-        mk("sleep_hours", "#5ac8b0"),
+        mk("sleep_hours", c.accent),
         mk("social_count", "#7aa2f7"),
         mk("energy", "#c3a6ff"),
-        mk("neg_sentiment", "#e0913e"),
+        mk("neg_sentiment", c.tier2),
       ],
     },
     options: {
-      plugins: { legend: { labels: { color: "#8ea0ab", boxWidth: 12 } } },
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: c.text, boxWidth: 12, usePointStyle: true } } },
       scales: {
-        y: { position: "left", ticks: { color: "#8ea0ab" }, grid: { color: "#26323a" } },
+        y: { position: "left", ticks: { color: c.text }, grid: { color: c.grid } },
         y1: {
           position: "right", min: 0, max: 1,
-          ticks: { color: "#e0913e" }, grid: { display: false },
-          title: { display: true, text: "tone", color: "#e0913e" },
+          ticks: { color: c.tier2 }, grid: { display: false },
+          title: { display: true, text: "tone", color: c.tier2 },
         },
-        x: { ticks: { color: "#8ea0ab", maxTicksLimit: 12 }, grid: { display: false } },
+        x: { ticks: { color: c.text, maxTicksLimit: 12 }, grid: { display: false } },
       },
     },
   });
 }
 
-// ---- Crisis resources ------------------------------------------------------
+// ---- Crisis Resources -------------------------------------------------------
 async function loadResources() {
   try {
     const data = await api("/resources");
@@ -184,34 +240,26 @@ async function loadResources() {
     list.innerHTML = data.crisis_resources
       .map(
         (r) => `<li>
-          <div class="r-name">${r.name} <span class="muted small">(${r.region})</span></div>
+          <div class="r-name">${r.name} <span style="color:var(--text-secondary);font-size:12px">(${r.region})</span></div>
           <div class="r-contact">${r.contact}</div>
           <a href="${r.url}" target="_blank" rel="noopener">${r.url}</a>
         </li>`
       )
       .join("");
-  } catch (e) {
-    /* resources are best-effort */
-  }
+  } catch (e) { /* best-effort */ }
 }
 
-function openCrisis() {
-  document.getElementById("crisisModal").classList.remove("hidden");
-}
-function closeCrisis() {
-  document.getElementById("crisisModal").classList.add("hidden");
-}
+function openCrisis() { document.getElementById("crisisModal").classList.remove("hidden"); }
+function closeCrisis() { document.getElementById("crisisModal").classList.add("hidden"); }
 
-// ---- Assessments (PHQ-9 / GAD-7) -------------------------------------------
+// ---- Assessments ------------------------------------------------------------
 let ASSESS_SCHEMA = null;
 
 async function loadAssessmentSchema() {
   try {
     ASSESS_SCHEMA = await api("/assessments/schema");
     renderAssessment();
-  } catch (e) {
-    /* best-effort */
-  }
+  } catch (e) { /* best-effort */ }
 }
 
 function renderAssessment() {
@@ -225,9 +273,7 @@ function renderAssessment() {
     <div class="assess-item">
       <label>${i + 1}. ${item}</label>
       <select data-idx="${i}">
-        ${opts
-          .map((o) => `<option value="${o.value}">${o.value} · ${o.label}</option>`)
-          .join("")}
+        ${opts.map((o) => `<option value="${o.value}">${o.value} - ${o.label}</option>`).join("")}
       </select>
     </div>`
     )
@@ -241,7 +287,7 @@ async function submitAssessment(e) {
     document.querySelectorAll("#assessItems select")
   ).map((s) => parseInt(s.value, 10));
   const status = document.getElementById("assessStatus");
-  status.textContent = "Submitting…";
+  status.textContent = "Submitting...";
   try {
     const res = await api("/assessments", {
       method: "POST",
@@ -257,7 +303,7 @@ async function submitAssessment(e) {
   }
 }
 
-// ---- Evaluation panel ------------------------------------------------------
+// ---- Evaluation Panel -------------------------------------------------------
 function metricTile(label, value, sub) {
   return `<div class="metric">
     <div class="metric-val">${value}</div>
@@ -271,42 +317,64 @@ async function loadEval() {
   try {
     const e = await api("/eval");
     if (!e.available) {
-      panel.innerHTML =
-        '<p class="muted">Load the demo or add assessments to see metrics.</p>';
+      panel.innerHTML = '<p class="empty-state">Load the demo or add assessments to see metrics.</p>';
       return;
     }
     const c = e.correlation || {};
-    const fmt = (v) => (v == null ? "—" : v);
-    const lead = e.lead_time_days == null ? "—" : `${e.lead_time_days} d`;
+    const fmt = (v) => (v == null ? "--" : v);
+    const lead = e.lead_time_days == null ? "--" : `${e.lead_time_days}d`;
     panel.innerHTML =
-      metricTile("Corr · PHQ-9", fmt(c["PHQ-9"]), "Aura vs PHQ-9") +
-      metricTile("Corr · GAD-7", fmt(c["GAD-7"]), "Aura vs GAD-7") +
-      metricTile("Lead time", lead, "before 1st PHQ-9 case") +
-      metricTile("Precision", fmt(e.precision), "tier≥2 alerts") +
+      metricTile("Corr PHQ-9", fmt(c["PHQ-9"]), "Aura vs PHQ-9") +
+      metricTile("Corr GAD-7", fmt(c["GAD-7"]), "Aura vs GAD-7") +
+      metricTile("Lead time", lead, "before 1st case") +
+      metricTile("Precision", fmt(e.precision), "tier 2+ alerts") +
       metricTile("Recall", fmt(e.recall), "of case days") +
-      metricTile("F1", fmt(e.f1), "");
+      metricTile("F1", fmt(e.f1), "harmonic mean");
   } catch (err) {
-    panel.innerHTML = '<p class="muted">Evaluation unavailable.</p>';
+    panel.innerHTML = '<p class="empty-state">Evaluation unavailable.</p>';
   }
 }
 
-// ---- Refresh + events ------------------------------------------------------
-async function refresh() {
-  await Promise.all([loadStatus(), loadTimeline(), loadEval()]);
-}
-
+// ---- Service Tags -----------------------------------------------------------
 async function loadEngineMode() {
   try {
     const h = await api("/health");
     document.getElementById("engineMode").textContent = h.gemini_enabled
       ? `Gemini: ${h.model}`
-      : "Offline analyzer (no API key)";
+      : "Offline analyzer";
+
+    // Storage badge
+    const badge = document.getElementById("storageBadge");
+    badge.textContent = h.storage === "firestore" ? "Cloud" : "Local";
+
+    // Footer service tags
+    const toggle = (id, active) => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle("active", active);
+    };
+    toggle("serviceGemini", h.gemini_enabled);
+    toggle("serviceFirebase", h.storage === "firestore");
+    toggle("serviceLogging", h.cloud_logging);
+
+    // Show auth overlay if Firebase is enabled but no token
+    if (h.firebase_auth && !authToken) {
+      document.getElementById("authOverlay").classList.remove("hidden");
+    }
   } catch (e) {
     document.getElementById("engineMode").textContent = "offline";
   }
 }
 
+// ---- Refresh + Events -------------------------------------------------------
+async function refresh() {
+  await Promise.all([loadStatus(), loadTimeline(), loadEval()]);
+}
+
 function wireEvents() {
+  // Theme toggle
+  document.getElementById("themeToggle").addEventListener("click", toggleTheme);
+
+  // Energy slider
   const energy = document.getElementById("energyInput");
   energy.addEventListener("input", () => {
     document.getElementById("energyVal").textContent = energy.value;
@@ -314,10 +382,11 @@ function wireEvents() {
 
   document.getElementById("dateInput").valueAsDate = new Date();
 
+  // Entry form
   document.getElementById("entryForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const status = document.getElementById("formStatus");
-    status.textContent = "Saving…";
+    status.textContent = "Saving...";
     const body = {
       date: document.getElementById("dateInput").value || null,
       journal_text: document.getElementById("journalInput").value,
@@ -327,15 +396,16 @@ function wireEvents() {
     };
     try {
       await api("/entries", { method: "POST", body: JSON.stringify(body) });
-      status.textContent = "Saved ✓";
+      status.textContent = "Saved";
       document.getElementById("journalInput").value = "";
       await refresh();
-      setTimeout(() => (status.textContent = ""), 1500);
+      setTimeout(() => (status.textContent = ""), 2000);
     } catch (err) {
       status.textContent = "Error saving";
     }
   });
 
+  // Seed + wipe
   document.getElementById("seedBtn").addEventListener("click", async () => {
     await api("/seed", {
       method: "POST",
@@ -345,22 +415,25 @@ function wireEvents() {
   });
 
   document.getElementById("wipeBtn").addEventListener("click", async () => {
-    if (!confirm("Delete ALL locally stored check-ins? This cannot be undone."))
-      return;
+    if (!confirm("Delete ALL check-ins? This cannot be undone.")) return;
     await api("/data", { method: "DELETE" });
     await refresh();
   });
 
+  // Crisis modal
   document.getElementById("openCrisis").addEventListener("click", openCrisis);
   document.getElementById("openCrisis2").addEventListener("click", openCrisis);
   document.getElementById("closeCrisis").addEventListener("click", closeCrisis);
+  document.getElementById("modalBackdrop").addEventListener("click", closeCrisis);
 
-  document
-    .getElementById("assessForm")
-    .addEventListener("submit", submitAssessment);
-  document
-    .getElementById("instrumentSelect")
-    .addEventListener("change", renderAssessment);
+  // Assessments
+  document.getElementById("assessForm").addEventListener("submit", submitAssessment);
+  document.getElementById("instrumentSelect").addEventListener("change", renderAssessment);
+
+  // Sign in button (placeholder for Firebase SDK integration)
+  document.getElementById("googleSignIn").addEventListener("click", () => {
+    alert("To enable Google Sign-in, configure Firebase Auth.\nSee docs/DEPLOY.md for setup steps.");
+  });
 }
 
 function numOrNull(id) {
@@ -368,7 +441,8 @@ function numOrNull(id) {
   return v === "" ? null : Number(v);
 }
 
-// ---- Init ------------------------------------------------------------------
+// ---- Init -------------------------------------------------------------------
+initTheme();
 wireEvents();
 loadEngineMode();
 loadResources();

@@ -4,3 +4,7 @@ python-dotenv>=1.0,<2.0
 # Optional: only needed to enable Gemini-based sentiment. The app runs fully
 # offline (deterministic analyzer) if this is absent or no API key is set.
 google-genai>=1.0,<2.0
+# Optional: Firebase (Firestore + Auth). Not needed for local SQLite mode.
+firebase-admin>=6.0,<7.0
+# Optional: Google Cloud Logging. Only active when CLOUD_LOGGING_ENABLED=true.
+google-cloud-logging>=3.0,<4.0

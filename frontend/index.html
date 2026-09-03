@@ -1,161 +1,232 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Aura — early-warning companion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
+  <!-- Auth overlay (shown when Firebase Auth is enabled) -->
+  <div id="authOverlay" class="auth-overlay hidden">
+    <div class="auth-card">
+      <div class="auth-logo">&#9682;</div>
+      <h1>Welcome to Aura</h1>
+      <p class="auth-subtitle">A private early-warning companion for your wellbeing</p>
+      <button id="googleSignIn" class="auth-btn google-btn">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Sign in with Google
+      </button>
+      <p class="auth-note">Your data stays private. We never share or sell your information.</p>
+    </div>
+  </div>
+
   <header class="topbar">
     <div class="brand">
-      <span class="logo">◐</span>
+      <span class="logo">&#9682;</span>
       <div>
         <h1>Aura</h1>
         <p class="tagline">A private early-warning companion for your wellbeing</p>
       </div>
     </div>
-    <div class="mode" id="engineMode" title="Feature-extraction engine">…</div>
+    <div class="topbar-actions">
+      <div class="mode-badge" id="engineMode" title="Feature-extraction engine">...</div>
+      <button class="theme-toggle" id="themeToggle" title="Toggle dark mode" aria-label="Toggle theme">
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <div class="user-menu hidden" id="userMenu">
+        <span id="userEmail" class="user-email"></span>
+        <button id="signOutBtn" class="sign-out-btn">Sign out</button>
+      </div>
+    </div>
   </header>
 
-  <!-- Crisis banner: shown immediately on explicit crisis language, regardless
-       of the trend model. The app never contacts anyone for you. -->
+  <!-- Crisis banner -->
   <div id="crisisBanner" class="crisis-banner hidden">
-    <strong>It sounds like you might be going through something serious.</strong>
-    You deserve support right now. <button id="openCrisis" class="link-btn">See crisis resources →</button>
+    <div class="crisis-inner">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span><strong>It sounds like you might be going through something serious.</strong>
+      You deserve support right now.</span>
+      <button id="openCrisis" class="crisis-link">See crisis resources</button>
+    </div>
   </div>
 
-  <main class="grid">
-    <!-- Status / current reading -->
-    <section class="card status-card">
-      <h2>Today’s reading</h2>
-      <div class="gauge">
-        <div class="index-value" id="indexValue">—</div>
-        <div class="index-label">Aura Index</div>
+  <main class="dashboard">
+    <!-- Status card -->
+    <section class="card status-card" id="statusCard">
+      <div class="card-header">
+        <h2>Today's Reading</h2>
+        <span class="badge" id="storageBadge">Local</span>
       </div>
-      <div class="tier" id="tierBadge">No data yet</div>
-      <p class="tier-message" id="tierMessage">
-        Add a check-in or load the demo timeline to begin.
-      </p>
+      <div class="gauge-container">
+        <div class="gauge-ring" id="gaugeRing">
+          <svg viewBox="0 0 120 120" class="gauge-svg">
+            <circle cx="60" cy="60" r="52" class="gauge-bg" />
+            <circle cx="60" cy="60" r="52" class="gauge-fill" id="gaugeFill"
+              stroke-dasharray="327" stroke-dashoffset="327" />
+          </svg>
+          <div class="gauge-center">
+            <div class="index-value" id="indexValue">--</div>
+            <div class="index-label">AURA INDEX</div>
+          </div>
+        </div>
+      </div>
+      <div class="tier-badge" id="tierBadge">No data yet</div>
+      <p class="tier-message" id="tierMessage">Add a check-in or load the demo timeline to begin.</p>
 
-      <div class="why" id="whyBlock">
-        <h3>Why this reading</h3>
-        <ul id="whyList" class="why-list"><li class="muted">—</li></ul>
+      <div class="signals-section" id="whyBlock">
+        <h3>Contributing Signals</h3>
+        <ul id="whyList" class="signal-list"><li class="empty-state">--</li></ul>
       </div>
 
-      <div class="reflection hidden" id="reflectionBlock">
-        <h3>A gentle note</h3>
+      <div class="reflection-section hidden" id="reflectionBlock">
+        <h3>A Gentle Note</h3>
         <p id="reflectionText" class="reflection-text"></p>
       </div>
     </section>
 
-    <!-- Aura Index over time -->
-    <section class="card chart-card">
-      <h2>Aura Index over time</h2>
-      <p class="hint">Sustained, multi-signal drift raises the index — a single
-        rough day does not.</p>
-      <canvas id="auraChart" height="150"></canvas>
-    </section>
-
-    <!-- Underlying signals -->
-    <section class="card chart-card">
-      <h2>Underlying signals</h2>
-      <p class="hint">Each signal is measured against <em>your own</em> baseline,
-        not a population norm.</p>
-      <canvas id="signalsChart" height="150"></canvas>
-    </section>
-
-    <!-- Daily check-in -->
-    <section class="card">
-      <h2>Daily check-in</h2>
-      <form id="entryForm" class="form">
-        <label>Date
-          <input type="date" name="date" id="dateInput" />
-        </label>
-        <label>How did today feel? (journal)
-          <textarea name="journal_text" id="journalInput" rows="4"
-            placeholder="A few honest sentences about your day…"></textarea>
-        </label>
-        <div class="row">
-          <label>Sleep (hours)
-            <input type="number" name="sleep_hours" id="sleepInput"
-              min="0" max="24" step="0.5" placeholder="7.5" />
-          </label>
-          <label>Social contacts
-            <input type="number" name="social_count" id="socialInput"
-              min="0" max="200" step="1" placeholder="3" />
-          </label>
-          <label>Energy
-            <input type="range" name="energy" id="energyInput"
-              min="1" max="5" step="1" value="3" />
-            <span class="range-val" id="energyVal">3</span>
-          </label>
+    <!-- Charts row -->
+    <div class="charts-row">
+      <section class="card chart-card">
+        <div class="card-header">
+          <h2>Aura Index Over Time</h2>
         </div>
-        <button type="submit" class="primary">Save check-in</button>
-        <span class="form-status" id="formStatus"></span>
-      </form>
-    </section>
+        <p class="chart-hint">Sustained, multi-signal drift raises the index -- a single rough day does not.</p>
+        <div class="chart-wrapper">
+          <canvas id="auraChart"></canvas>
+        </div>
+      </section>
 
-    <!-- Controls + privacy -->
-    <section class="card">
-      <h2>Data &amp; privacy</h2>
-      <p class="muted small">
-        Everything is stored locally in a single SQLite file on the machine
-        running this app — no cloud account, no Firebase. Journal text is used
-        only to compute the signals shown here.
-      </p>
-      <div class="btn-row">
-        <button id="seedBtn" class="secondary">Load 60-day demo</button>
-        <button id="wipeBtn" class="danger">Delete all my data</button>
+      <section class="card chart-card">
+        <div class="card-header">
+          <h2>Underlying Signals</h2>
+        </div>
+        <p class="chart-hint">Each signal is measured against <em>your own</em> baseline, not a population norm.</p>
+        <div class="chart-wrapper">
+          <canvas id="signalsChart"></canvas>
+        </div>
+      </section>
+    </div>
+
+    <!-- Bottom row -->
+    <div class="bottom-row">
+      <!-- Daily check-in -->
+      <section class="card">
+        <div class="card-header">
+          <h2>Daily Check-in</h2>
+        </div>
+        <form id="entryForm" class="entry-form">
+          <div class="form-group">
+            <label for="dateInput">Date</label>
+            <input type="date" name="date" id="dateInput" />
+          </div>
+          <div class="form-group">
+            <label for="journalInput">How did today feel?</label>
+            <textarea name="journal_text" id="journalInput" rows="4"
+              placeholder="A few honest sentences about your day..."></textarea>
+          </div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label for="sleepInput">Sleep (hours)</label>
+              <input type="number" name="sleep_hours" id="sleepInput"
+                min="0" max="24" step="0.5" placeholder="7.5" />
+            </div>
+            <div class="form-group">
+              <label for="socialInput">Social contacts</label>
+              <input type="number" name="social_count" id="socialInput"
+                min="0" max="200" step="1" placeholder="3" />
+            </div>
+            <div class="form-group">
+              <label for="energyInput">Energy
+                <span class="energy-val" id="energyVal">3</span>
+              </label>
+              <input type="range" name="energy" id="energyInput"
+                min="1" max="5" step="1" value="3" />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save check-in</button>
+            <span class="form-status" id="formStatus"></span>
+          </div>
+        </form>
+      </section>
+
+      <!-- Data & Privacy -->
+      <section class="card">
+        <div class="card-header">
+          <h2>Data &amp; Privacy</h2>
+        </div>
+        <p class="privacy-text">
+          Your data is stored securely. When using SQLite mode, everything stays on this
+          machine. With Firebase, data is encrypted in Google Cloud. Journal text is used
+          only to compute the signals shown here.
+        </p>
+        <div class="btn-group">
+          <button id="seedBtn" class="btn btn-secondary">Load 60-day demo</button>
+          <button id="wipeBtn" class="btn btn-danger">Delete all my data</button>
+        </div>
+        <p class="data-info" id="dataInfo"></p>
+      </section>
+
+      <!-- Assessment -->
+      <section class="card">
+        <div class="card-header">
+          <h2>Mood Check</h2>
+          <select id="instrumentSelect" class="select-instrument">
+            <option value="PHQ-9">PHQ-9 (depression)</option>
+            <option value="GAD-7">GAD-7 (anxiety)</option>
+          </select>
+        </div>
+        <p class="chart-hint">Over the last 2 weeks, how often have you been bothered by the following?</p>
+        <form id="assessForm" class="assess-form">
+          <div id="assessItems"></div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Submit assessment</button>
+            <span class="form-status" id="assessStatus"></span>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <!-- Evaluation panel -->
+    <section class="card eval-card">
+      <div class="card-header">
+        <h2>Evaluation vs PHQ-9 / GAD-7</h2>
       </div>
-      <p class="muted small" id="dataInfo"></p>
-    </section>
-
-    <!-- Validated questionnaire (ground truth) -->
-    <section class="card">
-      <div class="assess-head">
-        <h2>Mood check (PHQ-9 / GAD-7)</h2>
-        <select id="instrumentSelect">
-          <option value="PHQ-9">PHQ-9 (depression)</option>
-          <option value="GAD-7">GAD-7 (anxiety)</option>
-        </select>
-      </div>
-      <p class="muted small">Over the last 2 weeks, how often have you been
-        bothered by the following?</p>
-      <form id="assessForm" class="assess-form">
-        <div id="assessItems"></div>
-        <button type="submit" class="primary">Submit assessment</button>
-        <span class="form-status" id="assessStatus"></span>
-      </form>
-    </section>
-
-    <!-- Evaluation harness -->
-    <section class="card chart-card">
-      <h2>Evaluation vs PHQ-9 / GAD-7</h2>
-      <p class="hint">Does the passive Aura Index track the validated
-        questionnaires — and warn earlier? (Illustrative on demo data.)</p>
+      <p class="chart-hint">Does the passive Aura Index track the validated questionnaires -- and warn earlier?</p>
       <div id="evalPanel" class="eval-grid">
-        <p class="muted">Load the demo or add assessments to see metrics.</p>
+        <p class="empty-state">Load the demo or add assessments to see metrics.</p>
       </div>
     </section>
   </main>
 
   <footer class="footer">
-    <p>
-      <strong>Aura is not a medical device</strong> and does not diagnose,
-      treat, or predict any condition. It is a self-awareness tool. If you are
-      in danger or crisis, contact your local emergency number or a
-      <button id="openCrisis2" class="link-btn">crisis helpline</button>.
-    </p>
+    <div class="footer-inner">
+      <p>
+        <strong>Aura is not a medical device</strong> and does not diagnose,
+        treat, or predict any condition. It is a self-awareness tool. If you are
+        in danger, contact your local emergency number or a
+        <button id="openCrisis2" class="crisis-link">crisis helpline</button>.
+      </p>
+      <div class="footer-services">
+        <span class="service-tag" id="serviceGemini">Gemini</span>
+        <span class="service-tag" id="serviceFirebase">Firebase</span>
+        <span class="service-tag" id="serviceLogging">Cloud Logging</span>
+      </div>
+    </div>
   </footer>
 
   <!-- Crisis resources modal -->
   <div id="crisisModal" class="modal hidden">
-    <div class="modal-body">
-      <button class="modal-close" id="closeCrisis">×</button>
-      <h2>You’re not alone</h2>
-      <p>If you’re thinking about harming yourself or in emotional crisis,
-        please reach out now.</p>
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-content">
+      <button class="modal-close" id="closeCrisis">&times;</button>
+      <h2>You're Not Alone</h2>
+      <p>If you're thinking about harming yourself or in emotional crisis, please reach out now.</p>
       <ul id="resourceList" class="resource-list"></ul>
     </div>
   </div>
