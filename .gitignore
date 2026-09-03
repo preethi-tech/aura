@@ -8,6 +8,8 @@ venv/
 # Local data & secrets
 *.db
 .env
+*.json
+firebase-service-account.json
 
 # OS / editor
 .DS_Store
