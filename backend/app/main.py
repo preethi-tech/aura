@@ -5,6 +5,7 @@ Authentication, Gemini AI, and Google Cloud Logging.
 """
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from datetime import date as date_cls
 
@@ -185,6 +186,22 @@ def eval_report(user_id: str = Depends(get_current_user)) -> dict:
 def verify_token(user_id: str = Depends(get_current_user)) -> dict:
     """Verify Firebase ID token and return user info."""
     return {"authenticated": True, "user_id": user_id}
+
+
+@api.get("/firebase-config")
+def firebase_config() -> dict:
+    """Return Firebase config for frontend initialization."""
+    if not settings.firestore_enabled:
+        return {"enabled": False}
+    return {
+        "enabled": True,
+        "config": {
+            "apiKey": "",  # Web API key - get from Firebase Console > Project Settings > General
+            "authDomain": f"{settings.FIREBASE_PROJECT_ID}.firebaseapp.com",
+            "projectId": settings.FIREBASE_PROJECT_ID,
+            "storageBucket": f"{settings.FIREBASE_PROJECT_ID}.appspot.com",
+        }
+    }
 
 
 @asynccontextmanager

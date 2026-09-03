@@ -8,6 +8,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <!-- Firebase Config will be loaded dynamically from backend -->
+  <script>
+    // Firebase config placeholder - will be loaded from /api/firebase-config
+    let firebaseConfig = null;
+  </script>
 </head>
 <body>
   <!-- Auth overlay (shown when Firebase Auth is enabled) -->
