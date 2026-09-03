@@ -1,0 +1,6 @@
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.34,<0.35
+python-dotenv>=1.0,<2.0
+# Optional: only needed to enable Gemini-based sentiment. The app runs fully
+# offline (deterministic analyzer) if this is absent or no API key is set.
+google-genai>=1.0,<2.0

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aura — early-warning companion</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◐</span>
+      <div>
+        <h1>Aura</h1>
+        <p class="tagline">A private early-warning companion for your wellbeing</p>
+      </div>
+    </div>
+    <div class="mode" id="engineMode" title="Feature-extraction engine">…</div>
+  </header>
+
+  <!-- Crisis banner: shown immediately on explicit crisis language, regardless
+       of the trend model. The app never contacts anyone for you. -->
+  <div id="crisisBanner" class="crisis-banner hidden">
+    <strong>It sounds like you might be going through something serious.</strong>
+    You deserve support right now. <button id="openCrisis" class="link-btn">See crisis resources →</button>
+  </div>
+
+  <main class="grid">
+    <!-- Status / current reading -->
+    <section class="card status-card">
+      <h2>Today’s reading</h2>
+      <div class="gauge">
+        <div class="index-value" id="indexValue">—</div>
+        <div class="index-label">Aura Index</div>
+      </div>
+      <div class="tier" id="tierBadge">No data yet</div>
+      <p class="tier-message" id="tierMessage">
+        Add a check-in or load the demo timeline to begin.
+      </p>
+
+      <div class="why" id="whyBlock">
+        <h3>Why this reading</h3>
+        <ul id="whyList" class="why-list"><li class="muted">—</li></ul>
+      </div>
+
+      <div class="reflection hidden" id="reflectionBlock">
+        <h3>A gentle note</h3>
+        <p id="reflectionText" class="reflection-text"></p>
+      </div>
+    </section>
+
+    <!-- Aura Index over time -->
+    <section class="card chart-card">
+      <h2>Aura Index over time</h2>
+      <p class="hint">Sustained, multi-signal drift raises the index — a single
+        rough day does not.</p>
+      <canvas id="auraChart" height="150"></canvas>
+    </section>
+
+    <!-- Underlying signals -->
+    <section class="card chart-card">
+      <h2>Underlying signals</h2>
+      <p class="hint">Each signal is measured against <em>your own</em> baseline,
+        not a population norm.</p>
+      <canvas id="signalsChart" height="150"></canvas>
+    </section>
+
+    <!-- Daily check-in -->
+    <section class="card">
+      <h2>Daily check-in</h2>
+      <form id="entryForm" class="form">
+        <label>Date
+          <input type="date" name="date" id="dateInput" />
+        </label>
+        <label>How did today feel? (journal)
+          <textarea name="journal_text" id="journalInput" rows="4"
+            placeholder="A few honest sentences about your day…"></textarea>
+        </label>
+        <div class="row">
+          <label>Sleep (hours)
+            <input type="number" name="sleep_hours" id="sleepInput"
+              min="0" max="24" step="0.5" placeholder="7.5" />
+          </label>
+          <label>Social contacts
+            <input type="number" name="social_count" id="socialInput"
+              min="0" max="200" step="1" placeholder="3" />
+          </label>
+          <label>Energy
+            <input type="range" name="energy" id="energyInput"
+              min="1" max="5" step="1" value="3" />
+            <span class="range-val" id="energyVal">3</span>
+          </label>
+        </div>
+        <button type="submit" class="primary">Save check-in</button>
+        <span class="form-status" id="formStatus"></span>
+      </form>
+    </section>
+
+    <!-- Controls + privacy -->
+    <section class="card">
+      <h2>Data &amp; privacy</h2>
+      <p class="muted small">
+        Everything is stored locally in a single SQLite file on the machine
+        running this app — no cloud account, no Firebase. Journal text is used
+        only to compute the signals shown here.
+      </p>
+      <div class="btn-row">
+        <button id="seedBtn" class="secondary">Load 60-day demo</button>
+        <button id="wipeBtn" class="danger">Delete all my data</button>
+      </div>
+      <p class="muted small" id="dataInfo"></p>
+    </section>
+
+    <!-- Validated questionnaire (ground truth) -->
+    <section class="card">
+      <div class="assess-head">
+        <h2>Mood check (PHQ-9 / GAD-7)</h2>
+        <select id="instrumentSelect">
+          <option value="PHQ-9">PHQ-9 (depression)</option>
+          <option value="GAD-7">GAD-7 (anxiety)</option>
+        </select>
+      </div>
+      <p class="muted small">Over the last 2 weeks, how often have you been
+        bothered by the following?</p>
+      <form id="assessForm" class="assess-form">
+        <div id="assessItems"></div>
+        <button type="submit" class="primary">Submit assessment</button>
+        <span class="form-status" id="assessStatus"></span>
+      </form>
+    </section>
+
+    <!-- Evaluation harness -->
+    <section class="card chart-card">
+      <h2>Evaluation vs PHQ-9 / GAD-7</h2>
+      <p class="hint">Does the passive Aura Index track the validated
+        questionnaires — and warn earlier? (Illustrative on demo data.)</p>
+      <div id="evalPanel" class="eval-grid">
+        <p class="muted">Load the demo or add assessments to see metrics.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>
+      <strong>Aura is not a medical device</strong> and does not diagnose,
+      treat, or predict any condition. It is a self-awareness tool. If you are
+      in danger or crisis, contact your local emergency number or a
+      <button id="openCrisis2" class="link-btn">crisis helpline</button>.
+    </p>
+  </footer>
+
+  <!-- Crisis resources modal -->
+  <div id="crisisModal" class="modal hidden">
+    <div class="modal-body">
+      <button class="modal-close" id="closeCrisis">×</button>
+      <h2>You’re not alone</h2>
+      <p>If you’re thinking about harming yourself or in emotional crisis,
+        please reach out now.</p>
+      <ul id="resourceList" class="resource-list"></ul>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
