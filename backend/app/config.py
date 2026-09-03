@@ -29,6 +29,7 @@ class Settings:
     # --- Firebase (optional) ------------------------------------------------
     FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "").strip()
     FIREBASE_CREDENTIALS: str = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    FIREBASE_WEB_API_KEY: str = os.getenv("FIREBASE_WEB_API_KEY", "").strip()
 
     # --- Storage ------------------------------------------------------------
     # "firestore" or "sqlite". Auto-selects firestore if FIREBASE_PROJECT_ID is set.

@@ -196,7 +196,7 @@ def firebase_config() -> dict:
     return {
         "enabled": True,
         "config": {
-            "apiKey": "",  # Web API key - get from Firebase Console > Project Settings > General
+            "apiKey": settings.FIREBASE_WEB_API_KEY,
             "authDomain": f"{settings.FIREBASE_PROJECT_ID}.firebaseapp.com",
             "projectId": settings.FIREBASE_PROJECT_ID,
             "storageBucket": f"{settings.FIREBASE_PROJECT_ID}.appspot.com",
