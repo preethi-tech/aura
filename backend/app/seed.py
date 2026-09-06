@@ -69,6 +69,9 @@ def generate(scenario: str = "decline", days: int = 60) -> list[dict]:
             social = rng.randint(3, 6)
             energy = rng.randint(4, 5)
             text = rng.choice(_STABLE_JOURNALS)
+            steps = max(200, round(rng.gauss(8500, 900)))
+            active = max(0, round(rng.gauss(45, 10)))
+            screen = max(30, round(rng.gauss(210, 35)))
         else:
             p = (i - decline_start) / max(1, days - decline_start - 1)
             sleep = round(_lerp(7.5, 4.3, p) + rng.gauss(0, 0.35), 1)
@@ -76,6 +79,10 @@ def generate(scenario: str = "decline", days: int = 60) -> list[dict]:
             energy = max(1, min(5, round(_lerp(4.1, 1.4, p) + rng.gauss(0, 0.4))))
             pool = _MILD if p < 0.34 else _MODERATE if p < 0.68 else _SEVERE
             text = rng.choice(pool)
+            # Passive signals decline in step with the behavioral drift.
+            steps = max(200, round(_lerp(8500, 2200, p) + rng.gauss(0, 700)))
+            active = max(0, round(_lerp(45, 8, p) + rng.gauss(0, 8)))
+            screen = max(30, round(_lerp(210, 430, p) + rng.gauss(0, 35)))
 
         entries.append({
             "date": d.isoformat(),
@@ -83,6 +90,9 @@ def generate(scenario: str = "decline", days: int = 60) -> list[dict]:
             "sleep_hours": max(0.0, min(24.0, sleep)),
             "social_count": int(social),
             "energy": int(energy),
+            "steps": int(steps),
+            "active_minutes": int(active),
+            "screen_time_min": int(screen),
         })
     return entries
 

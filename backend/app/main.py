@@ -18,24 +18,28 @@ from . import __version__
 from .analysis import compute_timeline
 from .assessments import INSTRUMENTS, RESPONSE_OPTIONS, score
 from .auth import get_current_user
+from .circle import build_nudge
 from .cloud_logging import logger, setup_logging
 from .config import settings
 from .evaluation import evaluate_stored
 from .features import extract_deterministic, extract_features
+from .insights import build_insights, forecast
+from .interventions import suggest
+from .passive import sync_passive
 from .safety import CRISIS_RESOURCES, detect_crisis
-from .schemas import AssessmentIn, EntryIn, SeedIn, StatusOut
+from .schemas import AssessmentIn, ContactIn, EntryIn, FitSyncIn, SeedIn, StatusOut
 from . import seed as seed_module
 
 # Dynamic DB backend selection
 if settings.firestore_enabled:
     from .firebase_db import (
-        delete_all, get_assessments, get_entries, init_db, upsert_assessment,
-        upsert_entry,
+        add_contact, delete_all, delete_contact, get_assessments, get_contacts,
+        get_entries, init_db, update_passive, upsert_assessment, upsert_entry,
     )
 else:
     from .db import (
-        delete_all, get_assessments, get_entries, init_db, upsert_assessment,
-        upsert_entry,
+        add_contact, delete_all, delete_contact, get_assessments, get_contacts,
+        get_entries, init_db, update_passive, upsert_assessment, upsert_entry,
     )
 
 api = APIRouter(prefix="/api")
@@ -43,7 +47,20 @@ api = APIRouter(prefix="/api")
 
 def _status_payload(user_id: str) -> dict:
     entries = get_entries(user_id)
-    return compute_timeline(entries)["summary"]
+    result = compute_timeline(entries)
+    summary = result["summary"]
+    timeline = result["timeline"]
+
+    tier = summary.get("tier") or 0
+    summary["interventions"] = suggest(tier, summary.get("top_signals", []))
+    summary["forecast"] = forecast(timeline)
+
+    # Circle of Care nudge is opt-in and only relevant at higher tiers.
+    if tier >= 2:
+        summary["circle_nudge"] = build_nudge(tier, get_contacts(user_id))
+    else:
+        summary["circle_nudge"] = None
+    return summary
 
 
 @api.get("/health")
@@ -93,6 +110,9 @@ def create_entry(payload: EntryIn,
         energy=payload.energy,
         features=feats,
         safety_flag=safety,
+        steps=payload.steps,
+        active_minutes=payload.active_minutes,
+        screen_time_min=payload.screen_time_min,
     )
     return _status_payload(user_id)
 
@@ -112,6 +132,9 @@ def seed(payload: SeedIn,
             energy=e["energy"],
             features=feats,
             safety_flag=detect_crisis(e["journal_text"]),
+            steps=e.get("steps"),
+            active_minutes=e.get("active_minutes"),
+            screen_time_min=e.get("screen_time_min"),
         )
     for a in seed_module.generate_assessments(
         scenario=payload.scenario, days=payload.days
@@ -180,6 +203,86 @@ def create_assessment(payload: AssessmentIn,
 @api.get("/eval")
 def eval_report(user_id: str = Depends(get_current_user)) -> dict:
     return evaluate_stored(user_id)
+
+
+@api.get("/insights")
+def insights(user_id: str = Depends(get_current_user)) -> dict:
+    """Explainable AI: weekly summary, recurring cycles, and trend forecast."""
+    entries = get_entries(user_id)
+    timeline = compute_timeline(entries)["timeline"]
+    return build_insights(timeline)
+
+
+@api.post("/fit/sync")
+def fit_sync(payload: FitSyncIn,
+             user_id: str = Depends(get_current_user)) -> dict:
+    """Pull passive signals (steps/active minutes/screen time) from Google Fit.
+
+    Falls back to a realistic simulation when no live OAuth token is provided
+    so the passive pipeline is always demoable. Only updates days that already
+    have a check-in (passive data augments, never fabricates, entries).
+    """
+    entries = get_entries(user_id)
+    if not entries:
+        return {"synced": 0, "source": "none",
+                "detail": "Add or seed check-ins first, then sync passive data."}
+    rows, source = sync_passive(
+        entries, days=payload.days, access_token=payload.access_token)
+    synced = 0
+    for r in rows:
+        ok = update_passive(
+            user_id=user_id,
+            date=r["date"],
+            steps=r.get("steps"),
+            active_minutes=r.get("active_minutes"),
+            screen_time_min=r.get("screen_time_min"),
+            sleep_hours=r.get("sleep_hours"),
+        )
+        synced += 1 if ok else 0
+    logger.info(f"Passive sync user={user_id} source={source} count={synced}")
+    return {"synced": synced, "source": source, **_status_payload(user_id)}
+
+
+@api.get("/contacts")
+def list_contacts(user_id: str = Depends(get_current_user)) -> dict:
+    return {"contacts": get_contacts(user_id)}
+
+
+@api.post("/contacts")
+def create_contact(payload: ContactIn,
+                   user_id: str = Depends(get_current_user)) -> dict:
+    c = add_contact(
+        user_id=user_id, name=payload.name, method=payload.method,
+        detail=payload.detail, notify_tier=payload.notify_tier,
+    )
+    logger.info(f"Contact added user={user_id}")
+    return c
+
+
+@api.delete("/contacts/{contact_id}")
+def remove_contact(contact_id: str,
+                   user_id: str = Depends(get_current_user)) -> dict:
+    # SQLite uses int ids; Firestore uses string ids. Accept both.
+    cid: object = contact_id
+    if not settings.firestore_enabled:
+        try:
+            cid = int(contact_id)
+        except ValueError:
+            cid = -1
+    n = delete_contact(user_id, cid)
+    return {"deleted": n}
+
+
+@api.get("/export")
+def export_data(user_id: str = Depends(get_current_user)) -> dict:
+    """Privacy-first data export: the user can download everything we hold."""
+    return {
+        "version": __version__,
+        "user_id": user_id,
+        "entries": get_entries(user_id),
+        "assessments": get_assessments(user_id),
+        "contacts": get_contacts(user_id),
+    }
 
 
 @api.post("/auth/verify")

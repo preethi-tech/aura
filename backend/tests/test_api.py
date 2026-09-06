@@ -56,3 +56,29 @@ def test_wipe_clears_data(client):
     d = client.delete("/api/data").json()
     assert d["deleted"] > 0
     assert client.get("/api/status").json()["has_data"] is False
+
+
+def test_health_advertises_features(client):
+    body = client.get("/api/health").json()
+    # New capability flags should be present for the frontend to read.
+    for key in ("storage", "firebase_auth", "cloud_logging"):
+        assert key in body
+
+
+def test_export_returns_all_data(client):
+    client.post("/api/seed", json={"scenario": "decline", "days": 20})
+    client.post("/api/contacts", json={
+        "name": "Pat", "method": "text", "detail": "", "notify_tier": 3,
+    })
+    exp = client.get("/api/export").json()
+    assert len(exp["entries"]) == 20
+    assert len(exp["assessments"]) > 0
+    assert len(exp["contacts"]) == 1
+    assert exp["version"]
+
+
+def test_status_includes_forecast_after_seed(client):
+    client.post("/api/seed", json={"scenario": "decline", "days": 60})
+    s = client.get("/api/status").json()
+    assert s["forecast"] is not None
+    assert s["forecast"]["available"] is True

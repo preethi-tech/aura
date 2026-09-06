@@ -91,6 +91,23 @@
         <ul id="whyList" class="signal-list"><li class="empty-state">--</li></ul>
       </div>
 
+      <div class="forecast-chip hidden" id="forecastChip">
+        <span class="forecast-icon" id="forecastIcon">&#8599;</span>
+        <span id="forecastText"></span>
+      </div>
+
+      <div class="intervention-section hidden" id="interventionBlock">
+        <h3>Try This Now</h3>
+        <div id="interventionList"></div>
+      </div>
+
+      <div class="circle-nudge hidden" id="circleNudgeBlock">
+        <h3>Your Circle of Care</h3>
+        <p class="nudge-headline" id="nudgeHeadline"></p>
+        <div id="nudgeContacts"></div>
+        <p class="nudge-privacy" id="nudgePrivacy"></p>
+      </div>
+
       <div class="reflection-section hidden" id="reflectionBlock">
         <h3>A Gentle Note</h3>
         <p id="reflectionText" class="reflection-text"></p>
@@ -119,6 +136,36 @@
         </div>
       </section>
     </div>
+
+    <!-- AI Insights -->
+    <section class="card insights-card">
+      <div class="card-header">
+        <h2>AI Insights</h2>
+        <span class="badge" id="insightSource">Explainable</span>
+      </div>
+      <div class="insights-grid">
+        <div class="insight-block">
+          <h3>Weekly Summary</h3>
+          <p id="weeklySummary" class="insight-text empty-state">Add a week of check-ins to unlock your summary.</p>
+        </div>
+        <div class="insight-block">
+          <h3>Recurring Patterns</h3>
+          <p id="cyclesText" class="insight-text empty-state">Patterns appear once there's enough history.</p>
+          <div class="chart-wrapper insight-chart">
+            <canvas id="weekdayChart"></canvas>
+          </div>
+        </div>
+        <div class="insight-block">
+          <h3>7-Day Outlook</h3>
+          <p id="forecastDetail" class="insight-text empty-state">A short-term projection will appear here.</p>
+          <div class="forecast-gauge">
+            <div class="forecast-now"><span id="fcNow">--</span><small>now</small></div>
+            <div class="forecast-arrow" id="fcArrow">&rarr;</div>
+            <div class="forecast-proj"><span id="fcProj">--</span><small>in 7d</small></div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- Bottom row -->
     <div class="bottom-row">
@@ -156,11 +203,38 @@
                 min="1" max="5" step="1" value="3" />
             </div>
           </div>
+          <div class="passive-toggle">
+            <button type="button" class="link-btn" id="togglePassive">+ Add passive signals (steps, screen time)</button>
+          </div>
+          <div class="form-row-3 hidden" id="passiveFields">
+            <div class="form-group">
+              <label for="stepsInput">Steps</label>
+              <input type="number" name="steps" id="stepsInput"
+                min="0" max="100000" step="1" placeholder="8000" />
+            </div>
+            <div class="form-group">
+              <label for="activeInput">Active min</label>
+              <input type="number" name="active_minutes" id="activeInput"
+                min="0" max="1440" step="1" placeholder="45" />
+            </div>
+            <div class="form-group">
+              <label for="screenInput">Screen (min)</label>
+              <input type="number" name="screen_time_min" id="screenInput"
+                min="0" max="1440" step="1" placeholder="200" />
+            </div>
+          </div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Save check-in</button>
             <span class="form-status" id="formStatus"></span>
           </div>
         </form>
+        <div class="fit-sync">
+          <button id="fitSyncBtn" class="btn btn-google">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Sync Google Fit
+          </button>
+          <span class="form-status" id="fitStatus"></span>
+        </div>
       </section>
 
       <!-- Data & Privacy -->
@@ -175,6 +249,7 @@
         </p>
         <div class="btn-group">
           <button id="seedBtn" class="btn btn-secondary">Load 60-day demo</button>
+          <button id="exportBtn" class="btn btn-secondary">Export my data</button>
           <button id="wipeBtn" class="btn btn-danger">Delete all my data</button>
         </div>
         <p class="data-info" id="dataInfo"></p>
@@ -197,6 +272,51 @@
             <span class="form-status" id="assessStatus"></span>
           </div>
         </form>
+      </section>
+
+      <!-- Circle of Care -->
+      <section class="card">
+        <div class="card-header">
+          <h2>Circle of Care</h2>
+        </div>
+        <p class="chart-hint">
+          Opt-in only. Add 1&ndash;2 people you trust. At higher tiers, Aura will
+          privately suggest you reach out &mdash; it never contacts anyone for you
+          and never shares your data.
+        </p>
+        <form id="contactForm" class="entry-form">
+          <div class="form-group">
+            <label for="contactName">Name</label>
+            <input type="text" id="contactName" placeholder="e.g. Sam" maxlength="120" />
+          </div>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label for="contactMethod">Reach via</label>
+              <select id="contactMethod" class="select-instrument">
+                <option value="text">Text</option>
+                <option value="phone">Phone</option>
+                <option value="email">Email</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="contactDetail">Detail</label>
+              <input type="text" id="contactDetail" placeholder="number / email" maxlength="200" />
+            </div>
+            <div class="form-group">
+              <label for="contactTier">Notify at</label>
+              <select id="contactTier" class="select-instrument">
+                <option value="3">Urgent only</option>
+                <option value="2">Connect+</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Add to circle</button>
+            <span class="form-status" id="contactStatus"></span>
+          </div>
+        </form>
+        <ul id="contactList" class="contact-list"></ul>
       </section>
     </div>
 

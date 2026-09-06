@@ -52,6 +52,9 @@ def upsert_entry(
     energy: int | None,
     features: dict,
     safety_flag: bool,
+    steps: int | None = None,
+    active_minutes: int | None = None,
+    screen_time_min: int | None = None,
 ) -> None:
     db = _get_db()
     doc_ref = db.collection("users").document(user_id).collection("entries").document(date)
@@ -62,10 +65,35 @@ def upsert_entry(
         "sleep_hours": sleep_hours,
         "social_count": social_count,
         "energy": energy,
+        "steps": steps,
+        "active_minutes": active_minutes,
+        "screen_time_min": screen_time_min,
         "features": features,
         "safety_flag": safety_flag,
         "created_at": datetime.now(timezone.utc).isoformat(),
-    })
+    }, merge=True)
+
+
+def update_passive(
+    *,
+    user_id: str,
+    date: str,
+    steps: int | None = None,
+    active_minutes: int | None = None,
+    screen_time_min: int | None = None,
+    sleep_hours: float | None = None,
+) -> bool:
+    db = _get_db()
+    doc_ref = db.collection("users").document(user_id).collection("entries").document(date)
+    if not doc_ref.get().exists:
+        return False
+    payload = {k: v for k, v in {
+        "steps": steps, "active_minutes": active_minutes,
+        "screen_time_min": screen_time_min, "sleep_hours": sleep_hours,
+    }.items() if v is not None}
+    if payload:
+        doc_ref.set(payload, merge=True)
+    return True
 
 
 def get_entries(user_id: str) -> list[dict]:
@@ -115,10 +143,54 @@ def get_assessments(user_id: str) -> list[dict]:
     return [doc.to_dict() for doc in docs]
 
 
+# --- Circle of Care contacts ------------------------------------------------
+def add_contact(
+    *, user_id: str, name: str, method: str, detail: str, notify_tier: int,
+) -> dict:
+    db = _get_db()
+    coll = db.collection("users").document(user_id).collection("contacts")
+    doc_ref = coll.document()
+    data = {
+        "id": doc_ref.id, "name": name, "method": method,
+        "detail": detail, "notify_tier": int(notify_tier),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    doc_ref.set(data)
+    return {"id": doc_ref.id, "name": name, "method": method,
+            "detail": detail, "notify_tier": int(notify_tier)}
+
+
+def get_contacts(user_id: str) -> list[dict]:
+    db = _get_db()
+    docs = (
+        db.collection("users").document(user_id).collection("contacts").stream()
+    )
+    out = []
+    for doc in docs:
+        d = doc.to_dict()
+        out.append({
+            "id": doc.id, "name": d.get("name"), "method": d.get("method"),
+            "detail": d.get("detail", ""), "notify_tier": d.get("notify_tier", 3),
+        })
+    return out
+
+
+def delete_contact(user_id: str, contact_id) -> int:
+    db = _get_db()
+    doc_ref = (
+        db.collection("users").document(user_id)
+        .collection("contacts").document(str(contact_id))
+    )
+    if doc_ref.get().exists:
+        doc_ref.delete()
+        return 1
+    return 0
+
+
 def delete_all(user_id: str) -> int:
     db = _get_db()
     count = 0
-    for coll_name in ("entries", "assessments"):
+    for coll_name in ("entries", "assessments", "contacts"):
         docs = db.collection("users").document(user_id).collection(coll_name).stream()
         for doc in docs:
             doc.reference.delete()

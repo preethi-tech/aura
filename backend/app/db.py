@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS entries (
     sleep_hours   REAL,
     social_count  INTEGER,
     energy        INTEGER,                    -- 1..5 self-report
+    steps         INTEGER,                    -- passive: daily step count
+    active_minutes INTEGER,                   -- passive: active/move minutes
+    screen_time_min INTEGER,                  -- passive: phone screen time
     features_json TEXT    NOT NULL DEFAULT '{}',
     safety_flag   INTEGER NOT NULL DEFAULT 0, -- crisis language detected
     created_at    TEXT    NOT NULL,
@@ -40,7 +43,26 @@ CREATE TABLE IF NOT EXISTS assessments (
     created_at    TEXT    NOT NULL,
     UNIQUE(user_id, date, instrument)
 );
+
+CREATE TABLE IF NOT EXISTS contacts (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       TEXT    NOT NULL,
+    name          TEXT    NOT NULL,
+    method        TEXT    NOT NULL DEFAULT 'other',
+    detail        TEXT    NOT NULL DEFAULT '',
+    notify_tier   INTEGER NOT NULL DEFAULT 3,
+    created_at    TEXT    NOT NULL
+);
 """
+
+# Columns added after the initial release; ALTER TABLE for older DB files.
+_MIGRATIONS = {
+    "entries": {
+        "steps": "INTEGER",
+        "active_minutes": "INTEGER",
+        "screen_time_min": "INTEGER",
+    },
+}
 
 
 @contextmanager
@@ -54,9 +76,19 @@ def get_conn() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add any columns missing from older database files."""
+    for table, cols in _MIGRATIONS.items():
+        existing = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        for col, decl in cols.items():
+            if col not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+
+
 def init_db() -> None:
     with get_conn() as conn:
         conn.executescript(_SCHEMA)
+        _migrate(conn)
 
 
 def upsert_entry(
@@ -69,6 +101,9 @@ def upsert_entry(
     energy: int | None,
     features: dict,
     safety_flag: bool,
+    steps: int | None = None,
+    active_minutes: int | None = None,
+    screen_time_min: int | None = None,
 ) -> None:
     """Insert or replace the entry for a given (user, date)."""
     with get_conn() as conn:
@@ -76,16 +111,20 @@ def upsert_entry(
             """
             INSERT INTO entries
                 (user_id, date, journal_text, sleep_hours, social_count,
-                 energy, features_json, safety_flag, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 energy, steps, active_minutes, screen_time_min,
+                 features_json, safety_flag, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, date) DO UPDATE SET
-                journal_text  = excluded.journal_text,
-                sleep_hours   = excluded.sleep_hours,
-                social_count  = excluded.social_count,
-                energy        = excluded.energy,
-                features_json = excluded.features_json,
-                safety_flag   = excluded.safety_flag,
-                created_at    = excluded.created_at
+                journal_text    = excluded.journal_text,
+                sleep_hours     = excluded.sleep_hours,
+                social_count    = excluded.social_count,
+                energy          = excluded.energy,
+                steps           = COALESCE(excluded.steps, entries.steps),
+                active_minutes  = COALESCE(excluded.active_minutes, entries.active_minutes),
+                screen_time_min = COALESCE(excluded.screen_time_min, entries.screen_time_min),
+                features_json   = excluded.features_json,
+                safety_flag     = excluded.safety_flag,
+                created_at      = excluded.created_at
             """,
             (
                 user_id,
@@ -94,11 +133,41 @@ def upsert_entry(
                 sleep_hours,
                 social_count,
                 energy,
+                steps,
+                active_minutes,
+                screen_time_min,
                 json.dumps(features),
                 1 if safety_flag else 0,
                 datetime.now(timezone.utc).isoformat(),
             ),
         )
+
+
+def update_passive(
+    *,
+    user_id: str,
+    date: str,
+    steps: int | None = None,
+    active_minutes: int | None = None,
+    screen_time_min: int | None = None,
+    sleep_hours: float | None = None,
+) -> bool:
+    """Update only passive fields on an existing entry. Returns True if a row
+    was updated (i.e. an entry existed for that date)."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            """
+            UPDATE entries SET
+                steps           = COALESCE(?, steps),
+                active_minutes  = COALESCE(?, active_minutes),
+                screen_time_min = COALESCE(?, screen_time_min),
+                sleep_hours     = COALESCE(?, sleep_hours)
+            WHERE user_id = ? AND date = ?
+            """,
+            (steps, active_minutes, screen_time_min, sleep_hours,
+             user_id, date),
+        )
+        return cur.rowcount > 0
 
 
 def get_entries(user_id: str) -> list[dict]:
@@ -161,8 +230,48 @@ def get_assessments(user_id: str) -> list[dict]:
     return out
 
 
+# --- Circle of Care contacts ------------------------------------------------
+def add_contact(
+    *, user_id: str, name: str, method: str, detail: str, notify_tier: int,
+) -> dict:
+    with get_conn() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO contacts
+                (user_id, name, method, detail, notify_tier, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (user_id, name, method, detail, int(notify_tier),
+             datetime.now(timezone.utc).isoformat()),
+        )
+        return {
+            "id": cur.lastrowid, "name": name, "method": method,
+            "detail": detail, "notify_tier": int(notify_tier),
+        }
+
+
+def get_contacts(user_id: str) -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, name, method, detail, notify_tier FROM contacts "
+            "WHERE user_id = ? ORDER BY id ASC",
+            (user_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_contact(user_id: str, contact_id: int) -> int:
+    with get_conn() as conn:
+        cur = conn.execute(
+            "DELETE FROM contacts WHERE user_id = ? AND id = ?",
+            (user_id, contact_id),
+        )
+        return cur.rowcount
+
+
 def delete_all(user_id: str) -> int:
     with get_conn() as conn:
         cur = conn.execute("DELETE FROM entries WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM assessments WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM contacts WHERE user_id = ?", (user_id,))
         return cur.rowcount

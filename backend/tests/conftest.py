@@ -8,9 +8,15 @@ import pathlib
 import tempfile
 
 # Point the app at a throwaway DB and force the offline (no-Gemini) path.
+# Also force the SQLite backend so a developer's local .env (which may enable
+# Firestore/Firebase) never leaks into the test run.
 _TEST_DB = os.path.join(tempfile.gettempdir(), "aura_test.db")
 os.environ["AURA_DB_PATH"] = _TEST_DB
 os.environ["GEMINI_API_KEY"] = ""
+os.environ["STORAGE_BACKEND"] = "sqlite"
+os.environ["FIREBASE_PROJECT_ID"] = ""
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ""
+os.environ["CLOUD_LOGGING_ENABLED"] = ""
 pathlib.Path(_TEST_DB).unlink(missing_ok=True)
 
 import pytest  # noqa: E402

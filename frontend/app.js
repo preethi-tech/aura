@@ -3,6 +3,7 @@
 const API = "/api";
 let auraChart = null;
 let signalsChart = null;
+let weekdayChart = null;
 
 // ---- Theme Toggle -----------------------------------------------------------
 function initTheme() {
@@ -18,6 +19,7 @@ function toggleTheme() {
   localStorage.setItem("aura-theme", next);
   // Redraw charts with new theme colors
   loadTimeline();
+  loadInsights();
 }
 
 function getThemeColors() {
@@ -122,6 +124,78 @@ async function loadStatus() {
   } else {
     refl.classList.add("hidden");
   }
+
+  renderForecastChip(s.forecast);
+  renderInterventions(s.interventions);
+  renderCircleNudge(s.circle_nudge);
+}
+
+function renderForecastChip(fc) {
+  const block = document.getElementById("forecastChip");
+  if (!fc || !fc.available) { block.classList.add("hidden"); return; }
+  const icon = document.getElementById("forecastIcon");
+  const arrows = { worsening: "\u2197", improving: "\u2198", stable: "\u2192" };
+  icon.textContent = arrows[fc.trend] || "\u2192";
+  icon.style.color =
+    fc.trend === "worsening" ? "var(--tier3)" :
+    fc.trend === "improving" ? "var(--tier0)" : "var(--text-secondary)";
+  document.getElementById("forecastText").textContent = fc.text;
+  block.classList.remove("hidden");
+}
+
+function renderInterventions(items) {
+  const block = document.getElementById("interventionBlock");
+  const list = document.getElementById("interventionList");
+  if (!items || !items.length) { block.classList.add("hidden"); return; }
+  list.innerHTML = items
+    .map(
+      (it) => `<div class="intervention">
+        <div class="intervention-title">${it.title}
+          <span class="intervention-dur">${it.duration}</span></div>
+        <div class="intervention-action">${it.action}</div>
+        <div class="intervention-why">${it.rationale}</div>
+      </div>`
+    )
+    .join("");
+  block.classList.remove("hidden");
+}
+
+function renderCircleNudge(nudge) {
+  const block = document.getElementById("circleNudgeBlock");
+  if (!nudge || !nudge.contacts || !nudge.contacts.length) {
+    block.classList.add("hidden");
+    return;
+  }
+  document.getElementById("nudgeHeadline").textContent = nudge.headline;
+  document.getElementById("nudgePrivacy").textContent = nudge.privacy_note;
+  document.getElementById("nudgeContacts").innerHTML = nudge.contacts
+    .map((c) => {
+      const enc = encodeURIComponent(c.message);
+      let link = "";
+      if (c.method === "email" && c.detail) {
+        link = `<a class="btn btn-secondary" href="mailto:${c.detail}?body=${enc}">Email ${c.name}</a>`;
+      } else if ((c.method === "text" || c.method === "phone") && c.detail) {
+        link = `<a class="btn btn-secondary" href="sms:${c.detail}?body=${enc}">Message ${c.name}</a>`;
+      }
+      return `<div class="nudge-contact">
+        <div class="nudge-contact-name">${c.name}</div>
+        <div class="nudge-message">${c.message}</div>
+        <div class="nudge-actions">
+          ${link}
+          <button class="btn btn-secondary nudge-copy" data-msg="${enc}">Copy message</button>
+        </div>
+      </div>`;
+    })
+    .join("");
+  // Wire copy buttons
+  block.querySelectorAll(".nudge-copy").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      navigator.clipboard.writeText(decodeURIComponent(btn.dataset.msg));
+      btn.textContent = "Copied";
+      setTimeout(() => (btn.textContent = "Copy message"), 1500);
+    });
+  });
+  block.classList.remove("hidden");
 }
 
 // ---- Charts -----------------------------------------------------------------
@@ -334,6 +408,115 @@ async function loadEval() {
   }
 }
 
+// ---- AI Insights ------------------------------------------------------------
+async function loadInsights() {
+  let data;
+  try {
+    data = await api("/insights");
+  } catch (e) { return; }
+
+  // Weekly summary
+  const ws = data.weekly_summary || {};
+  const wsEl = document.getElementById("weeklySummary");
+  const srcBadge = document.getElementById("insightSource");
+  if (ws.available) {
+    wsEl.textContent = ws.narrative;
+    wsEl.classList.remove("empty-state");
+    srcBadge.textContent = ws.narrative_source === "gemini" ? "Gemini" : "Explainable";
+  } else {
+    wsEl.textContent = ws.narrative || "Add more check-ins to unlock your summary.";
+    wsEl.classList.add("empty-state");
+  }
+
+  // Cycles + weekday chart
+  const cy = data.cycles || {};
+  const cyEl = document.getElementById("cyclesText");
+  if (cy.available) {
+    cyEl.textContent = cy.text || "No strong weekly pattern yet -- keep checking in.";
+    cyEl.classList.remove("empty-state");
+    renderWeekdayChart(cy.by_weekday || {});
+  } else {
+    cyEl.textContent = "Patterns appear once there's enough history.";
+    cyEl.classList.add("empty-state");
+  }
+
+  // Forecast
+  const fc = data.forecast || {};
+  const fcEl = document.getElementById("forecastDetail");
+  if (fc.available) {
+    fcEl.textContent = fc.text;
+    fcEl.classList.remove("empty-state");
+    document.getElementById("fcNow").textContent = Math.round(fc.current);
+    document.getElementById("fcProj").textContent = Math.round(fc.projected);
+    const arrow = document.getElementById("fcArrow");
+    arrow.innerHTML = fc.trend === "worsening" ? "&#8599;" :
+      fc.trend === "improving" ? "&#8600;" : "&rarr;";
+    document.getElementById("fcProj").style.color = colorForIndex(fc.projected);
+  } else {
+    fcEl.textContent = "A short-term projection will appear here.";
+    fcEl.classList.add("empty-state");
+  }
+}
+
+function renderWeekdayChart(byWeekday) {
+  const order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const labels = order.filter((d) => d in byWeekday);
+  const vals = labels.map((d) => byWeekday[d]);
+  const c = getThemeColors();
+  const ctx = document.getElementById("weekdayChart");
+  if (!ctx) return;
+  if (weekdayChart) weekdayChart.destroy();
+  weekdayChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        data: vals,
+        backgroundColor: vals.map(colorForIndex),
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { min: 0, max: 100, ticks: { color: c.text }, grid: { color: c.grid } },
+        x: { ticks: { color: c.text }, grid: { display: false } },
+      },
+    },
+  });
+}
+
+// ---- Circle of Care ---------------------------------------------------------
+async function loadContacts() {
+  let data;
+  try { data = await api("/contacts"); } catch (e) { return; }
+  const list = document.getElementById("contactList");
+  const contacts = data.contacts || [];
+  if (!contacts.length) {
+    list.innerHTML = '<li class="empty-state">No trusted contacts yet.</li>';
+    return;
+  }
+  list.innerHTML = contacts
+    .map(
+      (c) => `<li>
+        <span><strong>${c.name}</strong>
+          <span class="contact-meta">${c.method}${c.detail ? " &middot; " + c.detail : ""} &middot; notify tier ${c.notify_tier}+</span>
+        </span>
+        <button class="contact-del" data-id="${c.id}" title="Remove">&times;</button>
+      </li>`
+    )
+    .join("");
+  list.querySelectorAll(".contact-del").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await api(`/contacts/${btn.dataset.id}`, { method: "DELETE" });
+      await loadContacts();
+      await loadStatus();
+    });
+  });
+}
+
 // ---- Service Tags -----------------------------------------------------------
 async function loadEngineMode() {
   try {
@@ -388,7 +571,9 @@ async function loadEngineMode() {
 
 // ---- Refresh + Events -------------------------------------------------------
 async function refresh() {
-  await Promise.all([loadStatus(), loadTimeline(), loadEval()]);
+  await Promise.all([
+    loadStatus(), loadTimeline(), loadEval(), loadInsights(), loadContacts(),
+  ]);
 }
 
 function wireEvents() {
@@ -414,6 +599,9 @@ function wireEvents() {
       sleep_hours: numOrNull("sleepInput"),
       social_count: numOrNull("socialInput"),
       energy: parseInt(energy.value, 10),
+      steps: numOrNull("stepsInput"),
+      active_minutes: numOrNull("activeInput"),
+      screen_time_min: numOrNull("screenInput"),
     };
     try {
       await api("/entries", { method: "POST", body: JSON.stringify(body) });
@@ -436,9 +624,81 @@ function wireEvents() {
   });
 
   document.getElementById("wipeBtn").addEventListener("click", async () => {
-    if (!confirm("Delete ALL check-ins? This cannot be undone.")) return;
+    if (!confirm("Delete ALL data (check-ins + contacts)? This cannot be undone.")) return;
     await api("/data", { method: "DELETE" });
     await refresh();
+  });
+
+  // Export data
+  document.getElementById("exportBtn").addEventListener("click", async () => {
+    const data = await api("/export");
+    const blob = new Blob([JSON.stringify(data, null, 2)],
+      { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "aura-export.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // Passive fields toggle
+  document.getElementById("togglePassive").addEventListener("click", () => {
+    const fields = document.getElementById("passiveFields");
+    const btn = document.getElementById("togglePassive");
+    const shown = !fields.classList.contains("hidden");
+    fields.classList.toggle("hidden");
+    btn.textContent = shown
+      ? "+ Add passive signals (steps, screen time)"
+      : "- Hide passive signals";
+  });
+
+  // Google Fit sync
+  document.getElementById("fitSyncBtn").addEventListener("click", async () => {
+    const status = document.getElementById("fitStatus");
+    status.textContent = "Syncing...";
+    try {
+      const res = await api("/fit/sync", {
+        method: "POST", body: JSON.stringify({ days: 60 }),
+      });
+      if (res.synced > 0) {
+        status.textContent = `Synced ${res.synced} days (${res.source})`;
+        await refresh();
+      } else {
+        status.textContent = res.detail || "Nothing to sync yet";
+      }
+      setTimeout(() => (status.textContent = ""), 3500);
+    } catch (err) {
+      status.textContent = "Sync failed";
+    }
+  });
+
+  // Circle of Care: add contact
+  document.getElementById("contactForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const status = document.getElementById("contactStatus");
+    const name = document.getElementById("contactName").value.trim();
+    if (!name) { status.textContent = "Name required"; return; }
+    status.textContent = "Adding...";
+    try {
+      await api("/contacts", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          method: document.getElementById("contactMethod").value,
+          detail: document.getElementById("contactDetail").value,
+          notify_tier: parseInt(document.getElementById("contactTier").value, 10),
+        }),
+      });
+      document.getElementById("contactName").value = "";
+      document.getElementById("contactDetail").value = "";
+      status.textContent = "Added";
+      await loadContacts();
+      await loadStatus();
+      setTimeout(() => (status.textContent = ""), 2000);
+    } catch (err) {
+      status.textContent = "Error adding";
+    }
   });
 
   // Crisis modal

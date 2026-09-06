@@ -67,6 +67,13 @@ SIGNALS: list[Signal] = [
            "More absolute words (\u201calways/never\u201d) than usual."),
     Signal("future_focus_ratio", "Future orientation", "low", 0.7, 0.06,
            "Writing shows less looking-ahead / planning than usual."),
+    # --- Passive signals (wearable / phone) ---------------------------------
+    Signal("steps", "Activity", "low", 0.9, 1000.0,
+           "Daily movement (steps) has dropped below your usual level."),
+    Signal("active_minutes", "Active minutes", "low", 0.6, 12.0,
+           "You've logged fewer active minutes than usual."),
+    Signal("screen_time_min", "Screen time", "high", 0.7, 45.0,
+           "Phone screen time has risen above your usual level."),
 ]
 _SIGNAL_BY_KEY = {s.key: s for s in SIGNALS}
 
@@ -85,8 +92,14 @@ def _mad(xs: list[float], med: float) -> float:
     return _median([abs(x - med) for x in xs])
 
 
+_ENTRY_LEVEL_KEYS = {
+    "sleep_hours", "social_count", "energy",
+    "steps", "active_minutes", "screen_time_min",
+}
+
+
 def _signal_value(entry: dict, key: str) -> float | None:
-    if key in ("sleep_hours", "social_count", "energy"):
+    if key in _ENTRY_LEVEL_KEYS:
         v = entry.get(key)
     else:
         v = entry.get("features", {}).get(key)
@@ -142,6 +155,9 @@ def compute_timeline(entries: list[dict]) -> dict:
             "sleep_hours": entry.get("sleep_hours"),
             "social_count": entry.get("social_count"),
             "energy": entry.get("energy"),
+            "steps": entry.get("steps"),
+            "active_minutes": entry.get("active_minutes"),
+            "screen_time_min": entry.get("screen_time_min"),
             "neg_sentiment": entry.get("features", {}).get("neg_sentiment"),
             "reflection": entry.get("features", {}).get("reflection"),
         })
