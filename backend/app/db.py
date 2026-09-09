@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS entries (
     screen_time_min INTEGER,                  -- passive: phone screen time
     features_json TEXT    NOT NULL DEFAULT '{}',
     safety_flag   INTEGER NOT NULL DEFAULT 0, -- crisis language detected
+    source        TEXT    NOT NULL DEFAULT 'user',
     created_at    TEXT    NOT NULL,
     UNIQUE(user_id, date)
 );
@@ -72,6 +73,7 @@ _MIGRATIONS = {
         "steps": "INTEGER",
         "active_minutes": "INTEGER",
         "screen_time_min": "INTEGER",
+        "source": "TEXT NOT NULL DEFAULT 'user'",
     },
 }
 
@@ -115,6 +117,7 @@ def upsert_entry(
     steps: int | None = None,
     active_minutes: int | None = None,
     screen_time_min: int | None = None,
+    source: str = "user",
 ) -> None:
     """Insert or replace the entry for a given (user, date)."""
     with get_conn() as conn:
@@ -123,8 +126,8 @@ def upsert_entry(
             INSERT INTO entries
                 (user_id, date, journal_text, sleep_hours, social_count,
                  energy, steps, active_minutes, screen_time_min,
-                 features_json, safety_flag, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 features_json, safety_flag, source, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, date) DO UPDATE SET
                 journal_text    = excluded.journal_text,
                 sleep_hours     = excluded.sleep_hours,
@@ -135,6 +138,7 @@ def upsert_entry(
                 screen_time_min = COALESCE(excluded.screen_time_min, entries.screen_time_min),
                 features_json   = excluded.features_json,
                 safety_flag     = excluded.safety_flag,
+                source          = excluded.source,
                 created_at      = excluded.created_at
             """,
             (
@@ -149,6 +153,7 @@ def upsert_entry(
                 screen_time_min,
                 json.dumps(features),
                 1 if safety_flag else 0,
+                source,
                 datetime.now(timezone.utc).isoformat(),
             ),
         )

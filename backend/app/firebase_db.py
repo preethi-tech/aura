@@ -55,6 +55,7 @@ def upsert_entry(
     steps: int | None = None,
     active_minutes: int | None = None,
     screen_time_min: int | None = None,
+    source: str = "user",
 ) -> None:
     db = _get_db()
     doc_ref = db.collection("users").document(user_id).collection("entries").document(date)
@@ -70,6 +71,7 @@ def upsert_entry(
         "screen_time_min": screen_time_min,
         "features": features,
         "safety_flag": safety_flag,
+        "source": source,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }, merge=True)
 

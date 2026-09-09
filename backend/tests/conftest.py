@@ -17,6 +17,9 @@ os.environ["STORAGE_BACKEND"] = "sqlite"
 os.environ["FIREBASE_PROJECT_ID"] = ""
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ""
 os.environ["CLOUD_LOGGING_ENABLED"] = ""
+os.environ["BIGQUERY_ENABLED"] = ""
+os.environ["BIGQUERY_PROJECT_ID"] = ""
+os.environ["BIGQUERY_PSEUDONYM_SALT"] = ""
 pathlib.Path(_TEST_DB).unlink(missing_ok=True)
 
 import pytest  # noqa: E402

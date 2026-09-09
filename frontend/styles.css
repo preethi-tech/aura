@@ -490,6 +490,33 @@ input[type="range"]::-webkit-slider-thumb {
 .intervention-try:hover { opacity: 0.9; }
 .intervention-try:disabled { opacity: 0.5; cursor: default; }
 
+/* ===== BigQuery privacy analytics ===== */
+.bigquery-card { border-color: rgba(79, 110, 247, 0.45); }
+.bigquery-contract {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0;
+}
+.bigquery-contract > div {
+  padding: 14px; border-radius: var(--radius-sm); background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.bigquery-contract strong { display: block; font-size: 13px; margin-bottom: 5px; }
+.bigquery-contract p { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.bigquery-actions {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  padding: 14px 0; border-top: 1px solid var(--border);
+}
+.consent-check {
+  display: inline-flex; align-items: center; gap: 8px; color: var(--text);
+  font-size: 13px; cursor: pointer;
+}
+.consent-check input { width: 16px; height: 16px; accent-color: var(--accent); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+.bigquery-metrics {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 12px;
+}
+.bigquery-metrics .metric { padding: 12px 8px; }
+.bigquery-metrics .metric-val { font-size: 20px; overflow-wrap: anywhere; }
+
 /* ===== Utility ===== */
 .hidden { display: none !important; }
 .empty-state { color: var(--text-secondary); font-style: italic; font-size: 14px; }
@@ -500,11 +527,13 @@ input[type="range"]::-webkit-slider-thumb {
   .bottom-row { grid-template-columns: 1fr; }
   .eval-grid { grid-template-columns: repeat(3, 1fr); }
   .insights-grid { grid-template-columns: 1fr; }
+  .bigquery-metrics { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 640px) {
   .topbar { padding: 12px 16px; }
   .dashboard { padding: 16px; }
   .form-row-3 { grid-template-columns: 1fr; }
   .eval-grid { grid-template-columns: repeat(2, 1fr); }
+  .bigquery-contract, .bigquery-metrics { grid-template-columns: 1fr; }
   .footer-inner { flex-direction: column; text-align: center; }
 }

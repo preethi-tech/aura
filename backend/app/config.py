@@ -44,9 +44,29 @@ class Settings:
     # --- Cloud Logging (optional) -------------------------------------------
     CLOUD_LOGGING_ENABLED: bool = os.getenv("CLOUD_LOGGING_ENABLED", "").strip().lower() in ("true", "1", "yes")
 
+    # --- BigQuery analytics (optional, explicit opt-in) ---------------------
+    BIGQUERY_ENABLED: bool = os.getenv("BIGQUERY_ENABLED", "").strip().lower() in ("true", "1", "yes")
+    BIGQUERY_PROJECT_ID: str = os.getenv("BIGQUERY_PROJECT_ID", "").strip()
+    BIGQUERY_DATASET: str = os.getenv("BIGQUERY_DATASET", "aura_analytics").strip()
+    BIGQUERY_TABLE: str = os.getenv("BIGQUERY_TABLE", "daily_signals").strip()
+    BIGQUERY_LOCATION: str = os.getenv("BIGQUERY_LOCATION", "US").strip()
+    BIGQUERY_PSEUDONYM_SALT: str = os.getenv("BIGQUERY_PSEUDONYM_SALT", "").strip()
+    BIGQUERY_MAX_BYTES_BILLED: int = int(
+        os.getenv("BIGQUERY_MAX_BYTES_BILLED", "100000000")
+    )
+
     @property
     def gemini_enabled(self) -> bool:
         return bool(self.GEMINI_API_KEY)
+
+    @property
+    def bigquery_enabled(self) -> bool:
+        return bool(
+            self.BIGQUERY_ENABLED
+            and self.BIGQUERY_PROJECT_ID
+            and self.BIGQUERY_PSEUDONYM_SALT
+            and self.FIREBASE_PROJECT_ID
+        )
 
     @property
     def firestore_enabled(self) -> bool:

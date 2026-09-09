@@ -14,6 +14,8 @@ firebase-service-account.json
 # Presentation (local only)
 docs/generate_deck.py
 docs/Aura_Presentation.pptx
+docs/generate_judge_dossier.py
+docs/Aura_Technical_Judge_Dossier.docx
 ~$*
 *.tmp
 

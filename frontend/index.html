@@ -199,6 +199,44 @@
       </section>
     </div>
 
+    <section class="card bigquery-card" id="bigQueryCard">
+      <div class="card-header">
+        <h2>Privacy Analytics Warehouse</h2>
+        <span class="badge" id="bigQueryBadge">Checking BigQuery</span>
+      </div>
+      <p class="chart-hint">
+        Opt in to send only de-identified daily metrics to a partitioned BigQuery table and run SQL-backed personal and cohort insights.
+      </p>
+      <div class="bigquery-contract">
+        <div>
+          <strong>Included</strong>
+          <p>HMAC pseudonym, date, Aura Index, tier, numeric activity and wellbeing signals.</p>
+        </div>
+        <div>
+          <strong>Never exported</strong>
+          <p>Journal text, name, email, Firebase UID, auth tokens, contacts, assessment answers, or crisis text.</p>
+        </div>
+      </div>
+      <div class="bigquery-actions">
+        <label class="consent-check">
+          <input type="checkbox" id="bigQueryConsent" />
+          I consent to this de-identified export
+        </label>
+        <button id="bigQuerySyncBtn" class="btn btn-primary" disabled>Sync to BigQuery</button>
+        <button id="bigQueryDeleteBtn" class="btn btn-danger" disabled>Delete warehouse copy</button>
+        <span class="form-status" id="bigQueryStatus"></span>
+      </div>
+      <div class="bigquery-metrics hidden" id="bigQueryMetrics">
+        <div class="metric"><div class="metric-val" id="bqRows">--</div><div class="metric-label">My warehouse days</div></div>
+        <div class="metric"><div class="metric-val" id="bqAverage">--</div><div class="metric-label">BQ average index</div></div>
+        <div class="metric"><div class="metric-val" id="bqElevated">--</div><div class="metric-label">Elevated days</div></div>
+        <div class="metric"><div class="metric-val" id="bqMode">--</div><div class="metric-label">Data provenance</div></div>
+        <div class="metric"><div class="metric-val" id="bqParticipants">--</div><div class="metric-label">Real opt-in cohort</div></div>
+      </div>
+      <p class="data-info" id="bigQueryCohort"></p>
+      <p class="data-info" id="bigQueryTable"></p>
+    </section>
+
     <!-- Bottom row -->
     <div class="bottom-row">
       <!-- Daily check-in -->
@@ -376,6 +414,7 @@
       <div class="footer-services">
         <span class="service-tag" id="serviceGemini">Gemini</span>
         <span class="service-tag" id="serviceFirebase">Firebase</span>
+        <span class="service-tag" id="serviceBigQuery">BigQuery</span>
         <span class="service-tag" id="serviceLogging">Cloud Logging</span>
       </div>
     </div>

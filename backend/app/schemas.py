@@ -84,6 +84,13 @@ class FitSyncIn(BaseModel):
     access_token: str | None = None
 
 
+class BigQuerySyncIn(BaseModel):
+    consent: bool = Field(
+        default=False,
+        description="Explicit confirmation for this de-identified export.",
+    )
+
+
 class SignalContribution(BaseModel):
     key: str
     label: str

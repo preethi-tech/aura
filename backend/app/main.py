@@ -9,7 +9,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import date as date_cls
 
-from fastapi import APIRouter, Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -18,7 +18,12 @@ from . import __version__
 from . import engagement as engagement_mod
 from .analysis import compute_timeline
 from .assessments import INSTRUMENTS, RESPONSE_OPTIONS, score
-from .auth import get_current_user
+from .auth import get_authenticated_user, get_current_user
+from .bigquery_analytics import (
+    BigQueryAnalyticsError, delete_user as bigquery_delete,
+    status as bigquery_status, summary as bigquery_summary,
+    sync as bigquery_sync,
+)
 from .circle import build_nudge
 from .cloud_logging import logger, setup_logging
 from .config import settings
@@ -31,8 +36,8 @@ from .passive import sync_passive
 from .relapse import find_similar_past_episodes
 from .safety import CRISIS_RESOURCES, detect_crisis
 from .schemas import (
-    AssessmentIn, ContactIn, EntryIn, FitSyncIn, InterventionTryIn, SeedIn,
-    StatusOut,
+    AssessmentIn, BigQuerySyncIn, ContactIn, EntryIn, FitSyncIn,
+    InterventionTryIn, SeedIn, StatusOut,
 )
 from . import seed as seed_module
 
@@ -92,6 +97,7 @@ def health() -> dict:
         "storage": "firestore" if settings.firestore_enabled else "sqlite",
         "firebase_auth": settings.firestore_enabled,
         "cloud_logging": settings.CLOUD_LOGGING_ENABLED,
+        "bigquery_enabled": settings.bigquery_enabled,
     }
 
 
@@ -159,6 +165,7 @@ def seed(payload: SeedIn,
             steps=e.get("steps"),
             active_minutes=e.get("active_minutes"),
             screen_time_min=e.get("screen_time_min"),
+            source="synthetic_demo",
         )
     for a in seed_module.generate_assessments(
         scenario=payload.scenario, days=payload.days
@@ -190,9 +197,21 @@ def seed(payload: SeedIn,
 
 @api.delete("/data")
 def wipe(user_id: str = Depends(get_current_user)) -> dict:
+    analytics_deleted = None
+    if settings.bigquery_enabled:
+        try:
+            analytics_deleted = bigquery_delete(user_id)
+        except BigQueryAnalyticsError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Primary data was not deleted because the BigQuery copy "
+                    f"could not be deleted safely: {exc}"
+                ),
+            ) from exc
     n = delete_all(user_id)
-    logger.info(f"Data wiped for user={user_id} count={n}")
-    return {"deleted": n}
+    logger.info(f"Data wiped count={n}")
+    return {"deleted": n, "bigquery": analytics_deleted}
 
 
 @api.get("/resources")
@@ -317,6 +336,54 @@ def environment(lat: float | None = None, lon: float | None = None,
     entries = get_entries(user_id)
     timeline = compute_timeline(entries)["timeline"]
     return correlate_daylight(timeline, lat=lat, lon=lon)
+
+
+@api.get("/analytics/bigquery/status")
+def analytics_bigquery_status() -> dict:
+    return bigquery_status()
+
+
+@api.post("/analytics/bigquery/sync")
+def analytics_bigquery_sync(
+    payload: BigQuerySyncIn,
+    user_id: str = Depends(get_authenticated_user),
+) -> dict:
+    if not payload.consent:
+        raise HTTPException(
+            status_code=400,
+            detail="Explicit consent is required for each BigQuery export.",
+        )
+    entries = get_entries(user_id)
+    timeline = compute_timeline(entries)["timeline"]
+    try:
+        result = bigquery_sync(user_id, entries, timeline)
+    except BigQueryAnalyticsError as exc:
+        logger.warning(f"BigQuery sync unavailable: {exc}")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    logger.info(f"BigQuery sync user={user_id} count={result['synced']}")
+    return result
+
+
+@api.get("/analytics/bigquery/summary")
+def analytics_bigquery_summary(
+    user_id: str = Depends(get_authenticated_user),
+) -> dict:
+    try:
+        return bigquery_summary(user_id)
+    except BigQueryAnalyticsError as exc:
+        logger.warning(f"BigQuery summary unavailable: {exc}")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@api.delete("/analytics/bigquery/data")
+def analytics_bigquery_delete(
+    user_id: str = Depends(get_authenticated_user),
+) -> dict:
+    try:
+        return bigquery_delete(user_id)
+    except BigQueryAnalyticsError as exc:
+        logger.warning(f"BigQuery deletion unavailable: {exc}")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @api.post("/fit/sync")

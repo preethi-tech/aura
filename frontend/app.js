@@ -41,6 +41,10 @@ let authToken = null;
 
 async function api(path, opts = {}) {
   const headers = { "Content-Type": "application/json", ...opts.headers };
+  if (typeof firebase !== "undefined" && firebase.apps.length) {
+    const user = firebase.auth().currentUser;
+    if (user) authToken = await user.getIdToken();
+  }
   if (authToken) {
     headers["Authorization"] = `Bearer ${authToken}`;
   }
@@ -624,6 +628,73 @@ function renderSeasonalChart(series) {
   });
 }
 
+// ---- BigQuery Privacy Analytics --------------------------------------------
+let bigQueryEnabled = false;
+let bigQuerySummaryLoaded = false;
+
+async function loadBigQuery(force = false) {
+  const badge = document.getElementById("bigQueryBadge");
+  const button = document.getElementById("bigQuerySyncBtn");
+  const deleteButton = document.getElementById("bigQueryDeleteBtn");
+  const consent = document.getElementById("bigQueryConsent");
+  const statusEl = document.getElementById("bigQueryStatus");
+  if (!badge || !button) return;
+
+  let config;
+  try { config = await api("/analytics/bigquery/status"); }
+  catch (e) {
+    badge.textContent = "Unavailable";
+    statusEl.textContent = "Could not read BigQuery status";
+    return;
+  }
+
+  bigQueryEnabled = Boolean(config.enabled);
+  badge.textContent = bigQueryEnabled ? "BigQuery ready" : "Not configured";
+  button.disabled = !bigQueryEnabled || !consent.checked;
+  deleteButton.disabled = !bigQueryEnabled;
+  if (!bigQueryEnabled) {
+    statusEl.textContent = config.requested
+      ? `Missing: ${(config.missing || []).join(", ")}`
+      : "Enable BigQuery in the Cloud Run configuration";
+    return;
+  }
+  statusEl.textContent = "Ready for explicit opt-in sync";
+  document.getElementById("bigQueryTable").textContent = config.table_id || "";
+  if (bigQuerySummaryLoaded && !force) return;
+
+  try {
+    const result = await api("/analytics/bigquery/summary");
+    bigQuerySummaryLoaded = true;
+    renderBigQuerySummary(result);
+  } catch (e) {
+    statusEl.textContent = "BigQuery is configured; sync data to initialize the warehouse";
+  }
+}
+
+function renderBigQuerySummary(result) {
+  const metrics = document.getElementById("bigQueryMetrics");
+  const cohortEl = document.getElementById("bigQueryCohort");
+  if (!result || !result.available) {
+    metrics.classList.add("hidden");
+    cohortEl.textContent = "No de-identified warehouse rows yet. Load the demo, consent, then sync.";
+    return;
+  }
+  const mine = result.personal || {};
+  const cohort = result.cohort || {};
+  document.getElementById("bqRows").textContent = mine.daily_records ?? "--";
+  document.getElementById("bqAverage").textContent = mine.avg_aura_index ?? "--";
+  document.getElementById("bqElevated").textContent = mine.elevated_day_pct == null
+    ? "--" : `${mine.elevated_day_pct}%`;
+  document.getElementById("bqMode").textContent = mine.data_mode === "demo"
+    ? "Demo" : "User";
+  document.getElementById("bqParticipants").textContent = cohort.participants ?? 0;
+  cohortEl.textContent = cohort.available
+    ? `Privacy threshold met: cohort average ${cohort.avg_aura_index}, ${cohort.elevated_day_pct}% high-index days.`
+    : (cohort.reason || "Cohort metrics are privacy-suppressed.");
+  document.getElementById("bigQueryTable").textContent = result.table_id || "";
+  metrics.classList.remove("hidden");
+}
+
 // ---- Circle of Care ---------------------------------------------------------
 async function loadContacts() {
   let data;
@@ -654,6 +725,27 @@ async function loadContacts() {
 }
 
 // ---- Service Tags -----------------------------------------------------------
+let firebaseAuthListenerWired = false;
+
+function wireFirebaseAuthState() {
+  if (firebaseAuthListenerWired || typeof firebase === "undefined") return;
+  firebaseAuthListenerWired = true;
+  firebase.auth().onIdTokenChanged(async (user) => {
+    if (!user) {
+      authToken = null;
+      document.getElementById("userMenu").classList.add("hidden");
+      document.getElementById("authOverlay").classList.remove("hidden");
+      return;
+    }
+    authToken = await user.getIdToken();
+    document.getElementById("userEmail").textContent = user.email || "Signed in";
+    document.getElementById("userMenu").classList.remove("hidden");
+    document.getElementById("authOverlay").classList.add("hidden");
+    bigQuerySummaryLoaded = false;
+    await refresh();
+  });
+}
+
 async function loadEngineMode() {
   try {
     const h = await api("/health");
@@ -672,6 +764,7 @@ async function loadEngineMode() {
     };
     toggle("serviceGemini", h.gemini_enabled);
     toggle("serviceFirebase", h.storage === "firestore");
+    toggle("serviceBigQuery", h.bigquery_enabled);
     toggle("serviceLogging", h.cloud_logging);
 
     // Load Firebase config if enabled
@@ -684,6 +777,7 @@ async function loadEngineMode() {
           if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
           }
+          wireFirebaseAuthState();
         }
       } catch (e) {
         console.error("Failed to load Firebase config:", e);
@@ -709,7 +803,7 @@ async function loadEngineMode() {
 async function refresh() {
   await Promise.all([
     loadStatus(), loadTimeline(), loadEval(), loadInsights(), loadContacts(),
-    loadRelapse(), loadSeasonal(),
+    loadRelapse(), loadSeasonal(), loadBigQuery(),
   ]);
 }
 
@@ -767,8 +861,9 @@ function wireEvents() {
   });
 
   document.getElementById("wipeBtn").addEventListener("click", async () => {
-    if (!confirm("Delete ALL data (check-ins + contacts)? This cannot be undone.")) return;
+    if (!confirm("Delete ALL data (check-ins, contacts, and any BigQuery copy)? This cannot be undone.")) return;
     await api("/data", { method: "DELETE" });
+    bigQuerySummaryLoaded = false;
     await refresh();
   });
 
@@ -783,6 +878,45 @@ function wireEvents() {
     a.download = "aura-export.json";
     a.click();
     URL.revokeObjectURL(url);
+  });
+
+  const bigQueryConsent = document.getElementById("bigQueryConsent");
+  const bigQuerySyncBtn = document.getElementById("bigQuerySyncBtn");
+  const bigQueryDeleteBtn = document.getElementById("bigQueryDeleteBtn");
+  bigQueryConsent.addEventListener("change", () => {
+    bigQuerySyncBtn.disabled = !bigQueryEnabled || !bigQueryConsent.checked;
+  });
+  bigQuerySyncBtn.addEventListener("click", async () => {
+    const status = document.getElementById("bigQueryStatus");
+    bigQuerySyncBtn.disabled = true;
+    status.textContent = "Exporting the de-identified allowlist\u2026";
+    try {
+      const result = await api("/analytics/bigquery/sync", {
+        method: "POST", body: JSON.stringify({ consent: true }),
+      });
+      bigQueryConsent.checked = false;
+      bigQuerySummaryLoaded = false;
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      await loadBigQuery(true);
+      status.textContent = `${result.synced} ${result.data_mode === "demo" ? "synthetic demo" : "user"} rows synced; raw content excluded.`;
+    } catch (err) {
+      status.textContent = "Sync failed. Verify Firebase sign-in, BigQuery IAM, dataset, and secret configuration.";
+      bigQuerySyncBtn.disabled = !bigQueryEnabled || !bigQueryConsent.checked;
+    }
+  });
+  bigQueryDeleteBtn.addEventListener("click", async () => {
+    if (!confirm("Delete your pseudonymous BigQuery warehouse copy?")) return;
+    const status = document.getElementById("bigQueryStatus");
+    status.textContent = "Deleting warehouse copy\u2026";
+    try {
+      const result = await api("/analytics/bigquery/data", { method: "DELETE" });
+      bigQuerySummaryLoaded = false;
+      document.getElementById("bigQueryMetrics").classList.add("hidden");
+      status.textContent = `Deleted ${result.deleted} BigQuery rows.`;
+      await loadBigQuery(true);
+    } catch (err) {
+      status.textContent = "Deletion is temporarily unavailable; recent streaming rows can require up to 30 minutes.";
+    }
   });
 
   // Passive fields toggle

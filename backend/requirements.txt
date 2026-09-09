@@ -8,3 +8,5 @@ google-genai>=1.0,<2.0
 firebase-admin>=6.0,<7.0
 # Optional: Google Cloud Logging. Only active when CLOUD_LOGGING_ENABLED=true.
 google-cloud-logging>=3.0,<4.0
+# Optional: opt-in de-identified analytics warehouse and cohort queries.
+google-cloud-bigquery>=3.25,<4.0
