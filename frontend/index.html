@@ -63,344 +63,383 @@
     </div>
   </div>
 
+  <!-- Tab navigation -->
+  <nav class="tab-nav" id="tabNav">
+    <button class="tab-btn active" data-tab="dashboard">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </button>
+    <button class="tab-btn" data-tab="insights">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Insights
+    </button>
+    <button class="tab-btn" data-tab="checkin">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Check-in
+    </button>
+    <button class="tab-btn" data-tab="settings">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </button>
+  </nav>
+
   <main class="dashboard">
-    <!-- Status card -->
-    <section class="card status-card" id="statusCard">
-      <div class="card-header">
-        <h2>Today's Reading</h2>
-        <span class="badge" id="storageBadge">Local</span>
+    <!-- ==================== DASHBOARD TAB ==================== -->
+    <div class="tab-panel active" id="panel-dashboard">
+      <!-- Status + Charts side by side -->
+      <div class="dash-hero">
+        <!-- Status card (compact) -->
+        <section class="card status-card" id="statusCard">
+          <div class="card-header">
+            <h2>Today's Reading</h2>
+            <span class="badge" id="storageBadge">Local</span>
+          </div>
+          <div class="gauge-container">
+            <div class="gauge-ring" id="gaugeRing">
+              <svg viewBox="0 0 120 120" class="gauge-svg">
+                <circle cx="60" cy="60" r="52" class="gauge-bg" />
+                <circle cx="60" cy="60" r="52" class="gauge-fill" id="gaugeFill"
+                  stroke-dasharray="327" stroke-dashoffset="327" />
+              </svg>
+              <div class="gauge-center">
+                <div class="index-value" id="indexValue">--</div>
+                <div class="index-label">AURA INDEX</div>
+              </div>
+            </div>
+          </div>
+          <div class="tier-badge" id="tierBadge">No data yet</div>
+          <p class="tier-message" id="tierMessage">Add a check-in or load the demo timeline to begin.</p>
+
+          <div class="forecast-chip hidden" id="forecastChip">
+            <span class="forecast-icon" id="forecastIcon">&#8599;</span>
+            <span id="forecastText"></span>
+          </div>
+
+          <div class="signals-section" id="whyBlock">
+            <h3>Contributing Signals</h3>
+            <ul id="whyList" class="signal-list"><li class="empty-state">--</li></ul>
+          </div>
+
+          <div class="intervention-section hidden" id="interventionBlock">
+            <h3>Try This Now</h3>
+            <div id="interventionList"></div>
+          </div>
+
+          <div class="circle-nudge hidden" id="circleNudgeBlock">
+            <h3>Your Circle of Care</h3>
+            <p class="nudge-headline" id="nudgeHeadline"></p>
+            <div id="nudgeContacts"></div>
+            <p class="nudge-privacy" id="nudgePrivacy"></p>
+          </div>
+
+          <div class="reflection-section hidden" id="reflectionBlock">
+            <h3>A Gentle Note</h3>
+            <p id="reflectionText" class="reflection-text"></p>
+          </div>
+        </section>
+
+        <!-- Charts stacked -->
+        <div class="dash-charts">
+          <section class="card chart-card">
+            <div class="card-header">
+              <h2>Aura Index Over Time</h2>
+            </div>
+            <p class="chart-hint">Sustained, multi-signal drift raises the index -- a single rough day does not.</p>
+            <div class="chart-wrapper">
+              <canvas id="auraChart"></canvas>
+            </div>
+          </section>
+
+          <section class="card chart-card">
+            <div class="card-header">
+              <h2>Underlying Signals</h2>
+            </div>
+            <p class="chart-hint">Each signal is measured against <em>your own</em> baseline, not a population norm.</p>
+            <div class="chart-wrapper">
+              <canvas id="signalsChart"></canvas>
+            </div>
+          </section>
+        </div>
       </div>
-      <div class="gauge-container">
-        <div class="gauge-ring" id="gaugeRing">
-          <svg viewBox="0 0 120 120" class="gauge-svg">
-            <circle cx="60" cy="60" r="52" class="gauge-bg" />
-            <circle cx="60" cy="60" r="52" class="gauge-fill" id="gaugeFill"
-              stroke-dasharray="327" stroke-dashoffset="327" />
-          </svg>
-          <div class="gauge-center">
-            <div class="index-value" id="indexValue">--</div>
-            <div class="index-label">AURA INDEX</div>
+
+      <!-- Quick actions bar -->
+      <div class="quick-actions">
+        <button id="seedBtn" class="btn btn-secondary">Load demo</button>
+        <button id="fitSyncBtn" class="btn btn-google">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          Sync activity data (demo)
+        </button>
+        <span class="form-status" id="fitStatus"></span>
+        <span class="form-status" id="dataInfo"></span>
+      </div>
+    </div>
+
+    <!-- ==================== INSIGHTS TAB ==================== -->
+    <div class="tab-panel" id="panel-insights">
+      <!-- AI Insights -->
+      <section class="card insights-card">
+        <div class="card-header">
+          <h2>AI Insights</h2>
+          <span class="badge" id="insightSource">Explainable</span>
+        </div>
+        <div class="insights-grid">
+          <div class="insight-block">
+            <h3>Weekly Summary</h3>
+            <p id="weeklySummary" class="insight-text empty-state">Add a week of check-ins to unlock your summary.</p>
+          </div>
+          <div class="insight-block">
+            <h3>Recurring Patterns</h3>
+            <p id="cyclesText" class="insight-text empty-state">Patterns appear once there's enough history.</p>
+            <div class="chart-wrapper insight-chart">
+              <canvas id="weekdayChart"></canvas>
+            </div>
+          </div>
+          <div class="insight-block">
+            <h3>7-Day Outlook</h3>
+            <p id="forecastDetail" class="insight-text empty-state">A short-term projection will appear here.</p>
+            <div class="forecast-gauge">
+              <div class="forecast-now"><span id="fcNow">--</span><small>now</small></div>
+              <div class="forecast-arrow" id="fcArrow">&rarr;</div>
+              <div class="forecast-proj"><span id="fcProj">--</span><small>in 7d</small></div>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="tier-badge" id="tierBadge">No data yet</div>
-      <p class="tier-message" id="tierMessage">Add a check-in or load the demo timeline to begin.</p>
-
-      <div class="signals-section" id="whyBlock">
-        <h3>Contributing Signals</h3>
-        <ul id="whyList" class="signal-list"><li class="empty-state">--</li></ul>
-      </div>
-
-      <div class="forecast-chip hidden" id="forecastChip">
-        <span class="forecast-icon" id="forecastIcon">&#8599;</span>
-        <span id="forecastText"></span>
-      </div>
-
-      <div class="intervention-section hidden" id="interventionBlock">
-        <h3>Try This Now</h3>
-        <div id="interventionList"></div>
-      </div>
-
-      <div class="circle-nudge hidden" id="circleNudgeBlock">
-        <h3>Your Circle of Care</h3>
-        <p class="nudge-headline" id="nudgeHeadline"></p>
-        <div id="nudgeContacts"></div>
-        <p class="nudge-privacy" id="nudgePrivacy"></p>
-      </div>
-
-      <div class="reflection-section hidden" id="reflectionBlock">
-        <h3>A Gentle Note</h3>
-        <p id="reflectionText" class="reflection-text"></p>
-      </div>
-    </section>
-
-    <!-- Charts row -->
-    <div class="charts-row">
-      <section class="card chart-card">
-        <div class="card-header">
-          <h2>Aura Index Over Time</h2>
-        </div>
-        <p class="chart-hint">Sustained, multi-signal drift raises the index -- a single rough day does not.</p>
-        <div class="chart-wrapper">
-          <canvas id="auraChart"></canvas>
+        <div class="engagement-strip" id="engagementStrip">
+          <span class="engagement-dot" id="engagementDot"></span>
+          <span id="engagementText">Withdrawal detection appears once there's enough history.</span>
         </div>
       </section>
 
-      <section class="card chart-card">
+      <!-- Relapse fingerprinting + Seasonal context -->
+      <div class="charts-row">
+        <section class="card">
+          <div class="card-header">
+            <h2>Relapse Fingerprinting</h2>
+            <span class="badge">DTW pattern match</span>
+          </div>
+          <p class="chart-hint">Does your recent 14-day pattern resemble a decline you've been through before?</p>
+          <div id="relapsePanel">
+            <p class="empty-state">Comparing your recent window to past episodes&#8230;</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2>Seasonal Context</h2>
+            <span class="badge">Daylight</span>
+          </div>
+          <p class="chart-hint">Is your index linked to daylight hours? Naming a seasonal dip can reduce self-blame.</p>
+          <div id="seasonalPanel">
+            <p class="empty-state">Correlating your index with local daylight&#8230;</p>
+          </div>
+          <div class="chart-wrapper insight-chart hidden" id="seasonalChartWrap">
+            <canvas id="seasonalChart"></canvas>
+          </div>
+        </section>
+      </div>
+
+      <!-- Evaluation panel -->
+      <section class="card eval-card">
         <div class="card-header">
-          <h2>Underlying Signals</h2>
+          <h2>Evaluation vs PHQ-9 / GAD-7</h2>
         </div>
-        <p class="chart-hint">Each signal is measured against <em>your own</em> baseline, not a population norm.</p>
-        <div class="chart-wrapper">
-          <canvas id="signalsChart"></canvas>
+        <p class="chart-hint">Does the passive Aura Index track the validated questionnaires -- and warn earlier?</p>
+        <div id="evalPanel" class="eval-grid">
+          <p class="empty-state">Load the demo or add assessments to see metrics.</p>
         </div>
       </section>
     </div>
 
-    <!-- AI Insights -->
-    <section class="card insights-card">
-      <div class="card-header">
-        <h2>AI Insights</h2>
-        <span class="badge" id="insightSource">Explainable</span>
-      </div>
-      <div class="insights-grid">
-        <div class="insight-block">
-          <h3>Weekly Summary</h3>
-          <p id="weeklySummary" class="insight-text empty-state">Add a week of check-ins to unlock your summary.</p>
-        </div>
-        <div class="insight-block">
-          <h3>Recurring Patterns</h3>
-          <p id="cyclesText" class="insight-text empty-state">Patterns appear once there's enough history.</p>
-          <div class="chart-wrapper insight-chart">
-            <canvas id="weekdayChart"></canvas>
+    <!-- ==================== CHECK-IN TAB ==================== -->
+    <div class="tab-panel" id="panel-checkin">
+      <div class="checkin-grid">
+        <!-- Daily check-in -->
+        <section class="card">
+          <div class="card-header">
+            <h2>Daily Check-in</h2>
           </div>
-        </div>
-        <div class="insight-block">
-          <h3>7-Day Outlook</h3>
-          <p id="forecastDetail" class="insight-text empty-state">A short-term projection will appear here.</p>
-          <div class="forecast-gauge">
-            <div class="forecast-now"><span id="fcNow">--</span><small>now</small></div>
-            <div class="forecast-arrow" id="fcArrow">&rarr;</div>
-            <div class="forecast-proj"><span id="fcProj">--</span><small>in 7d</small></div>
+          <form id="entryForm" class="entry-form">
+            <div class="form-group">
+              <label for="dateInput">Date</label>
+              <input type="date" name="date" id="dateInput" />
+            </div>
+            <div class="form-group">
+              <label for="journalInput">How did today feel?</label>
+              <textarea name="journal_text" id="journalInput" rows="4"
+                placeholder="A few honest sentences about your day..."></textarea>
+            </div>
+            <div class="form-row-3">
+              <div class="form-group">
+                <label for="sleepInput">Sleep (hours)</label>
+                <input type="number" name="sleep_hours" id="sleepInput"
+                  min="0" max="24" step="0.5" placeholder="7.5" />
+              </div>
+              <div class="form-group">
+                <label for="socialInput">Social contacts</label>
+                <input type="number" name="social_count" id="socialInput"
+                  min="0" max="200" step="1" placeholder="3" />
+              </div>
+              <div class="form-group">
+                <label for="energyInput">Energy
+                  <span class="energy-val" id="energyVal">3</span>
+                </label>
+                <input type="range" name="energy" id="energyInput"
+                  min="1" max="5" step="1" value="3" />
+              </div>
+            </div>
+            <div class="passive-toggle">
+              <button type="button" class="link-btn" id="togglePassive">+ Add passive signals (steps, screen time)</button>
+            </div>
+            <div class="form-row-3 hidden" id="passiveFields">
+              <div class="form-group">
+                <label for="stepsInput">Steps</label>
+                <input type="number" name="steps" id="stepsInput"
+                  min="0" max="100000" step="1" placeholder="8000" />
+              </div>
+              <div class="form-group">
+                <label for="activeInput">Active min</label>
+                <input type="number" name="active_minutes" id="activeInput"
+                  min="0" max="1440" step="1" placeholder="45" />
+              </div>
+              <div class="form-group">
+                <label for="screenInput">Screen (min)</label>
+                <input type="number" name="screen_time_min" id="screenInput"
+                  min="0" max="1440" step="1" placeholder="200" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Save check-in</button>
+              <span class="form-status" id="formStatus"></span>
+            </div>
+          </form>
+          <p class="data-info">Demo uses simulated wearable data. Real Google&nbsp;Fit / Fitbit needs OAuth setup &mdash; see README.</p>
+        </section>
+
+        <!-- Assessment -->
+        <section class="card">
+          <div class="card-header">
+            <h2>Mood Check</h2>
+            <select id="instrumentSelect" class="select-instrument">
+              <option value="PHQ-9">PHQ-9 (depression)</option>
+              <option value="GAD-7">GAD-7 (anxiety)</option>
+            </select>
           </div>
-        </div>
+          <p class="chart-hint">Over the last 2 weeks, how often have you been bothered by the following?</p>
+          <form id="assessForm" class="assess-form">
+            <div id="assessItems"></div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Submit assessment</button>
+              <span class="form-status" id="assessStatus"></span>
+            </div>
+          </form>
+        </section>
       </div>
-      <div class="engagement-strip" id="engagementStrip">
-        <span class="engagement-dot" id="engagementDot"></span>
-        <span id="engagementText">Withdrawal detection appears once there's enough history.</span>
-      </div>
-    </section>
-
-    <!-- Relapse fingerprinting + Seasonal context -->
-    <div class="charts-row">
-      <section class="card">
-        <div class="card-header">
-          <h2>Relapse Fingerprinting</h2>
-          <span class="badge">DTW pattern match</span>
-        </div>
-        <p class="chart-hint">Does your recent 14-day pattern resemble a decline you've been through before?</p>
-        <div id="relapsePanel">
-          <p class="empty-state">Comparing your recent window to past episodes\u2026</p>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-header">
-          <h2>Seasonal Context</h2>
-          <span class="badge">Daylight</span>
-        </div>
-        <p class="chart-hint">Is your index linked to daylight hours? Naming a seasonal dip can reduce self-blame.</p>
-        <div id="seasonalPanel">
-          <p class="empty-state">Correlating your index with local daylight\u2026</p>
-        </div>
-        <div class="chart-wrapper insight-chart hidden" id="seasonalChartWrap">
-          <canvas id="seasonalChart"></canvas>
-        </div>
-      </section>
     </div>
 
-    <section class="card bigquery-card" id="bigQueryCard">
-      <div class="card-header">
-        <h2>Privacy Analytics Warehouse</h2>
-        <span class="badge" id="bigQueryBadge">Checking BigQuery</span>
-      </div>
-      <p class="chart-hint">
-        Opt in to send only de-identified daily metrics to a partitioned BigQuery table and run SQL-backed personal and cohort insights.
-      </p>
-      <div class="bigquery-contract">
-        <div>
-          <strong>Included</strong>
-          <p>HMAC pseudonym, date, Aura Index, tier, numeric activity and wellbeing signals.</p>
-        </div>
-        <div>
-          <strong>Never exported</strong>
-          <p>Journal text, name, email, Firebase UID, auth tokens, contacts, assessment answers, or crisis text.</p>
-        </div>
-      </div>
-      <div class="bigquery-actions">
-        <label class="consent-check">
-          <input type="checkbox" id="bigQueryConsent" />
-          I consent to this de-identified export
-        </label>
-        <button id="bigQuerySyncBtn" class="btn btn-primary" disabled>Sync to BigQuery</button>
-        <button id="bigQueryDeleteBtn" class="btn btn-danger" disabled>Delete warehouse copy</button>
-        <span class="form-status" id="bigQueryStatus"></span>
-      </div>
-      <div class="bigquery-metrics hidden" id="bigQueryMetrics">
-        <div class="metric"><div class="metric-val" id="bqRows">--</div><div class="metric-label">My warehouse days</div></div>
-        <div class="metric"><div class="metric-val" id="bqAverage">--</div><div class="metric-label">BQ average index</div></div>
-        <div class="metric"><div class="metric-val" id="bqElevated">--</div><div class="metric-label">Elevated days</div></div>
-        <div class="metric"><div class="metric-val" id="bqMode">--</div><div class="metric-label">Data provenance</div></div>
-        <div class="metric"><div class="metric-val" id="bqParticipants">--</div><div class="metric-label">Real opt-in cohort</div></div>
-      </div>
-      <p class="data-info" id="bigQueryCohort"></p>
-      <p class="data-info" id="bigQueryTable"></p>
-    </section>
+    <!-- ==================== SETTINGS TAB ==================== -->
+    <div class="tab-panel" id="panel-settings">
+      <div class="settings-grid">
+        <!-- Data & Privacy -->
+        <section class="card">
+          <div class="card-header">
+            <h2>Data &amp; Privacy</h2>
+          </div>
+          <p class="privacy-text">
+            Your data is stored securely. When using SQLite mode, everything stays on this
+            machine. With Firebase, data is encrypted in Google Cloud. Journal text is used
+            only to compute the signals shown here.
+          </p>
+          <div class="btn-group">
+            <button id="exportBtn" class="btn btn-secondary">Export my data</button>
+            <button id="wipeBtn" class="btn btn-danger">Delete all my data</button>
+          </div>
+        </section>
 
-    <!-- Bottom row -->
-    <div class="bottom-row">
-      <!-- Daily check-in -->
-      <section class="card">
-        <div class="card-header">
-          <h2>Daily Check-in</h2>
-        </div>
-        <form id="entryForm" class="entry-form">
-          <div class="form-group">
-            <label for="dateInput">Date</label>
-            <input type="date" name="date" id="dateInput" />
+        <!-- Circle of Care -->
+        <section class="card">
+          <div class="card-header">
+            <h2>Circle of Care</h2>
           </div>
-          <div class="form-group">
-            <label for="journalInput">How did today feel?</label>
-            <textarea name="journal_text" id="journalInput" rows="4"
-              placeholder="A few honest sentences about your day..."></textarea>
-          </div>
-          <div class="form-row-3">
+          <p class="chart-hint">
+            Opt-in only. Add 1&ndash;2 people you trust. At higher tiers, Aura will
+            privately suggest you reach out &mdash; it never contacts anyone for you
+            and never shares your data.
+          </p>
+          <form id="contactForm" class="entry-form">
             <div class="form-group">
-              <label for="sleepInput">Sleep (hours)</label>
-              <input type="number" name="sleep_hours" id="sleepInput"
-                min="0" max="24" step="0.5" placeholder="7.5" />
+              <label for="contactName">Name</label>
+              <input type="text" id="contactName" placeholder="e.g. Sam" maxlength="120" />
             </div>
-            <div class="form-group">
-              <label for="socialInput">Social contacts</label>
-              <input type="number" name="social_count" id="socialInput"
-                min="0" max="200" step="1" placeholder="3" />
+            <div class="form-row-3">
+              <div class="form-group">
+                <label for="contactMethod">Reach via</label>
+                <select id="contactMethod" class="select-instrument">
+                  <option value="text">Text</option>
+                  <option value="phone">Phone</option>
+                  <option value="email">Email</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="contactDetail">Detail</label>
+                <input type="text" id="contactDetail" placeholder="number / email" maxlength="200" />
+              </div>
+              <div class="form-group">
+                <label for="contactTier">Notify at</label>
+                <select id="contactTier" class="select-instrument">
+                  <option value="3">Urgent only</option>
+                  <option value="2">Connect+</option>
+                </select>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="energyInput">Energy
-                <span class="energy-val" id="energyVal">3</span>
-              </label>
-              <input type="range" name="energy" id="energyInput"
-                min="1" max="5" step="1" value="3" />
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Add to circle</button>
+              <span class="form-status" id="contactStatus"></span>
             </div>
-          </div>
-          <div class="passive-toggle">
-            <button type="button" class="link-btn" id="togglePassive">+ Add passive signals (steps, screen time)</button>
-          </div>
-          <div class="form-row-3 hidden" id="passiveFields">
-            <div class="form-group">
-              <label for="stepsInput">Steps</label>
-              <input type="number" name="steps" id="stepsInput"
-                min="0" max="100000" step="1" placeholder="8000" />
-            </div>
-            <div class="form-group">
-              <label for="activeInput">Active min</label>
-              <input type="number" name="active_minutes" id="activeInput"
-                min="0" max="1440" step="1" placeholder="45" />
-            </div>
-            <div class="form-group">
-              <label for="screenInput">Screen (min)</label>
-              <input type="number" name="screen_time_min" id="screenInput"
-                min="0" max="1440" step="1" placeholder="200" />
-            </div>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Save check-in</button>
-            <span class="form-status" id="formStatus"></span>
-          </div>
-        </form>
-        <div class="fit-sync">
-          <button id="fitSyncBtn" class="btn btn-google">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-            Sync activity data (demo)
-          </button>
-          <span class="form-status" id="fitStatus"></span>
-        </div>
-        <p class="data-info">Demo uses simulated wearable data. Real Google&nbsp;Fit / Fitbit needs OAuth setup &mdash; see README.</p>
-      </section>
+          </form>
+          <ul id="contactList" class="contact-list"></ul>
+        </section>
 
-      <!-- Data & Privacy -->
-      <section class="card">
-        <div class="card-header">
-          <h2>Data &amp; Privacy</h2>
-        </div>
-        <p class="privacy-text">
-          Your data is stored securely. When using SQLite mode, everything stays on this
-          machine. With Firebase, data is encrypted in Google Cloud. Journal text is used
-          only to compute the signals shown here.
-        </p>
-        <div class="btn-group">
-          <button id="seedBtn" class="btn btn-secondary">Load demo</button>
-          <button id="exportBtn" class="btn btn-secondary">Export my data</button>
-          <button id="wipeBtn" class="btn btn-danger">Delete all my data</button>
-        </div>
-        <p class="data-info" id="dataInfo"></p>
-      </section>
-
-      <!-- Assessment -->
-      <section class="card">
-        <div class="card-header">
-          <h2>Mood Check</h2>
-          <select id="instrumentSelect" class="select-instrument">
-            <option value="PHQ-9">PHQ-9 (depression)</option>
-            <option value="GAD-7">GAD-7 (anxiety)</option>
-          </select>
-        </div>
-        <p class="chart-hint">Over the last 2 weeks, how often have you been bothered by the following?</p>
-        <form id="assessForm" class="assess-form">
-          <div id="assessItems"></div>
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Submit assessment</button>
-            <span class="form-status" id="assessStatus"></span>
+        <!-- BigQuery Warehouse -->
+        <section class="card bigquery-card" id="bigQueryCard">
+          <div class="card-header">
+            <h2>Privacy Analytics Warehouse</h2>
+            <span class="badge" id="bigQueryBadge">Checking BigQuery</span>
           </div>
-        </form>
-      </section>
-
-      <!-- Circle of Care -->
-      <section class="card">
-        <div class="card-header">
-          <h2>Circle of Care</h2>
-        </div>
-        <p class="chart-hint">
-          Opt-in only. Add 1&ndash;2 people you trust. At higher tiers, Aura will
-          privately suggest you reach out &mdash; it never contacts anyone for you
-          and never shares your data.
-        </p>
-        <form id="contactForm" class="entry-form">
-          <div class="form-group">
-            <label for="contactName">Name</label>
-            <input type="text" id="contactName" placeholder="e.g. Sam" maxlength="120" />
-          </div>
-          <div class="form-row-3">
-            <div class="form-group">
-              <label for="contactMethod">Reach via</label>
-              <select id="contactMethod" class="select-instrument">
-                <option value="text">Text</option>
-                <option value="phone">Phone</option>
-                <option value="email">Email</option>
-                <option value="other">Other</option>
-              </select>
+          <p class="chart-hint">
+            Opt in to send only de-identified daily metrics to a partitioned BigQuery table and run SQL-backed personal and cohort insights.
+          </p>
+          <div class="bigquery-contract">
+            <div>
+              <strong>Included</strong>
+              <p>HMAC pseudonym, date, Aura Index, metric version, provenance.</p>
             </div>
-            <div class="form-group">
-              <label for="contactDetail">Detail</label>
-              <input type="text" id="contactDetail" placeholder="number / email" maxlength="200" />
-            </div>
-            <div class="form-group">
-              <label for="contactTier">Notify at</label>
-              <select id="contactTier" class="select-instrument">
-                <option value="3">Urgent only</option>
-                <option value="2">Connect+</option>
-              </select>
+            <div>
+              <strong>Never exported</strong>
+              <p>Journal text, name, email, Firebase UID, auth tokens, contacts, assessment answers, or crisis text.</p>
             </div>
           </div>
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Add to circle</button>
-            <span class="form-status" id="contactStatus"></span>
+          <div class="bigquery-actions">
+            <label class="consent-check">
+              <input type="checkbox" id="bigQueryConsent" />
+              I consent to this de-identified export
+            </label>
+            <button id="bigQuerySyncBtn" class="btn btn-primary" disabled>Sync to BigQuery</button>
+            <button id="bigQueryDeleteBtn" class="btn btn-danger" disabled>Delete warehouse copy</button>
+            <span class="form-status" id="bigQueryStatus"></span>
           </div>
-        </form>
-        <ul id="contactList" class="contact-list"></ul>
-      </section>
+          <div class="bigquery-metrics hidden" id="bigQueryMetrics">
+            <div class="metric"><div class="metric-val" id="bqRows">--</div><div class="metric-label">My warehouse days</div></div>
+            <div class="metric"><div class="metric-val" id="bqAverage">--</div><div class="metric-label">BQ average index</div></div>
+            <div class="metric"><div class="metric-val" id="bqElevated">--</div><div class="metric-label">Elevated days</div></div>
+            <div class="metric"><div class="metric-val" id="bqMode">--</div><div class="metric-label">Data provenance</div></div>
+            <div class="metric"><div class="metric-val" id="bqParticipants">--</div><div class="metric-label">Real opt-in cohort</div></div>
+          </div>
+          <p class="data-info" id="bigQueryCohort"></p>
+          <p class="data-info" id="bigQueryTable"></p>
+        </section>
+      </div>
     </div>
-
-    <!-- Evaluation panel -->
-    <section class="card eval-card">
-      <div class="card-header">
-        <h2>Evaluation vs PHQ-9 / GAD-7</h2>
-      </div>
-      <p class="chart-hint">Does the passive Aura Index track the validated questionnaires -- and warn earlier?</p>
-      <div id="evalPanel" class="eval-grid">
-        <p class="empty-state">Load the demo or add assessments to see metrics.</p>
-      </div>
-    </section>
   </main>
 
   <footer class="footer">

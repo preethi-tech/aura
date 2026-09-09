@@ -5,6 +5,30 @@ let auraChart = null;
 let signalsChart = null;
 let weekdayChart = null;
 
+// ---- Tab Navigation ---------------------------------------------------------
+function initTabs() {
+  const btns = document.querySelectorAll(".tab-btn");
+  btns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.tab;
+      btns.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+      const panel = document.getElementById("panel-" + target);
+      if (panel) panel.classList.add("active");
+      // Refresh charts when switching to a tab that contains them
+      if (target === "dashboard") {
+        loadTimeline();
+      } else if (target === "insights") {
+        loadInsights();
+        loadRelapse();
+        loadSeasonal();
+        loadEval();
+      }
+    });
+  });
+}
+
 // ---- Theme Toggle -----------------------------------------------------------
 function initTheme() {
   const saved = localStorage.getItem("aura-theme");
@@ -808,6 +832,9 @@ async function refresh() {
 }
 
 function wireEvents() {
+  // Tab navigation
+  initTabs();
+
   // Theme toggle
   document.getElementById("themeToggle").addEventListener("click", toggleTheme);
 
@@ -838,6 +865,8 @@ function wireEvents() {
       await api("/entries", { method: "POST", body: JSON.stringify(body) });
       status.textContent = "Saved";
       document.getElementById("journalInput").value = "";
+      // Switch to dashboard tab to show the result
+      document.querySelector('[data-tab="dashboard"]').click();
       await refresh();
       setTimeout(() => (status.textContent = ""), 2000);
     } catch (err) {
