@@ -11,6 +11,10 @@ venv/
 *.json
 firebase-service-account.json
 
+# Presentation (local only)
+docs/generate_deck.py
+docs/Aura_Presentation.pptx
+
 # OS / editor
 .DS_Store
 .idea/
