@@ -20,6 +20,7 @@ function toggleTheme() {
   // Redraw charts with new theme colors
   loadTimeline();
   loadInsights();
+  loadSeasonal();
 }
 
 function getThemeColors() {
@@ -126,8 +127,25 @@ async function loadStatus() {
   }
 
   renderForecastChip(s.forecast);
-  renderInterventions(s.interventions);
+  renderInterventions(s.interventions, s.proven_intervention);
   renderCircleNudge(s.circle_nudge);
+  renderEngagement(s.engagement);
+}
+
+function renderEngagement(eng) {
+  const strip = document.getElementById("engagementStrip");
+  const dot = document.getElementById("engagementDot");
+  const text = document.getElementById("engagementText");
+  if (!strip) return;
+  if (!eng || !eng.available) {
+    text.textContent = eng && eng.message
+      ? eng.message
+      : "Withdrawal detection appears once there's enough history.";
+    dot.className = "engagement-dot";
+    return;
+  }
+  text.textContent = eng.message;
+  dot.className = "engagement-dot" + (eng.withdrawal ? " warn" : "");
 }
 
 function renderForecastChip(fc) {
@@ -143,20 +161,43 @@ function renderForecastChip(fc) {
   block.classList.remove("hidden");
 }
 
-function renderInterventions(items) {
+function interventionCard(it) {
+  const effect = it.effect_text
+    ? `<div class="intervention-effect">\u2713 ${it.effect_text}</div>` : "";
+  return `<div class="intervention${it.proven ? " proven" : ""}">
+      <div class="intervention-title">${it.title}
+        <span class="intervention-dur">${it.duration}</span></div>
+      <div class="intervention-action">${it.action}</div>
+      <div class="intervention-why">${it.rationale}</div>
+      ${effect}
+      <button class="intervention-try" data-key="${it.key}">I'll try this</button>
+    </div>`;
+}
+
+function renderInterventions(items, proven) {
   const block = document.getElementById("interventionBlock");
   const list = document.getElementById("interventionList");
   if (!items || !items.length) { block.classList.add("hidden"); return; }
-  list.innerHTML = items
-    .map(
-      (it) => `<div class="intervention">
-        <div class="intervention-title">${it.title}
-          <span class="intervention-dur">${it.duration}</span></div>
-        <div class="intervention-action">${it.action}</div>
-        <div class="intervention-why">${it.rationale}</div>
-      </div>`
-    )
-    .join("");
+  // Show the "proven for you" pick first if it isn't already in the list.
+  let cards = items;
+  if (proven && !items.some((i) => i.key === proven.key)) {
+    cards = [proven, ...items];
+  }
+  list.innerHTML = cards.map(interventionCard).join("");
+  list.querySelectorAll(".intervention-try").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        const r = await api("/interventions/try", {
+          method: "POST", body: JSON.stringify({ key: btn.dataset.key }),
+        });
+        btn.textContent = "Logged \u2014 next check-in measures it";
+      } catch (e) {
+        btn.textContent = "Try again";
+        btn.disabled = false;
+      }
+    });
+  });
   block.classList.remove("hidden");
 }
 
@@ -488,6 +529,101 @@ function renderWeekdayChart(byWeekday) {
   });
 }
 
+// ---- Relapse Fingerprinting -------------------------------------------------
+async function loadRelapse() {
+  const panel = document.getElementById("relapsePanel");
+  if (!panel) return;
+  let data;
+  try { data = await api("/relapse"); } catch (e) { return; }
+  if (!data.available) {
+    panel.innerHTML = `<p class="empty-state">${data.reason || "Not enough history yet."}</p>`;
+    return;
+  }
+  if (!data.matches || !data.matches.length) {
+    panel.innerHTML = `<p class="empty-state">${data.note || "No prior decline episodes match your recent pattern \u2014 that's a good sign."}</p>`;
+    return;
+  }
+  panel.innerHTML = data.matches
+    .map((m) => {
+      const helped = m.what_helped
+        ? `<div class="relapse-helped">What helped around then: <strong>${m.what_helped.title}</strong> \u2014 ${m.what_helped.action}</div>`
+        : "";
+      return `<div class="relapse-match">
+        <span class="relapse-sim">${m.similarity}%</span>
+        <span class="relapse-range">similar to your episode ${m.start} \u2192 ${m.end} (peaked ${m.peak_index})</span>
+        ${helped}
+      </div>`;
+    })
+    .join("");
+}
+
+// ---- Seasonal Context -------------------------------------------------------
+let seasonalChart = null;
+async function loadSeasonal() {
+  const panel = document.getElementById("seasonalPanel");
+  const wrap = document.getElementById("seasonalChartWrap");
+  if (!panel) return;
+  let data;
+  try {
+    let path = "/environment";
+    if (window.__auraGeo) {
+      path += `?lat=${window.__auraGeo.lat}&lon=${window.__auraGeo.lon}`;
+    }
+    data = await api(path);
+  } catch (e) { return; }
+  if (!data.available) {
+    panel.innerHTML = `<p class="empty-state">${data.reason || "Seasonal context unavailable."}</p>`;
+    wrap.classList.add("hidden");
+    return;
+  }
+  const loc = data.location_is_default
+    ? '<div class="seasonal-note">Using a demo location \u2014 allow location access for your own correlation.</div>'
+    : "";
+  panel.innerHTML = `
+    <div class="seasonal-head">
+      <span class="seasonal-corr">${data.correlation}</span>
+      <span class="seasonal-corr-label">correlation<br>(index vs daylight)</span>
+    </div>
+    <p class="insight-text">${data.interpretation}</p>${loc}`;
+  wrap.classList.remove("hidden");
+  renderSeasonalChart(data.series);
+}
+
+function renderSeasonalChart(series) {
+  const c = getThemeColors();
+  const ctx = document.getElementById("seasonalChart");
+  if (!ctx) return;
+  if (seasonalChart) seasonalChart.destroy();
+  const labels = series.map((s) => s.date.slice(5));
+  seasonalChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Aura Index", data: series.map((s) => s.aura_index),
+          borderColor: c.accent, backgroundColor: c.accent + "18",
+          pointRadius: 0, borderWidth: 2, tension: 0.3, yAxisID: "y",
+        },
+        {
+          label: "Daylight (h)", data: series.map((s) => s.daylight),
+          borderColor: c.tier1, pointRadius: 0, borderWidth: 2,
+          tension: 0.3, yAxisID: "y1",
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: c.text, boxWidth: 12, usePointStyle: true } } },
+      scales: {
+        y: { position: "left", min: 0, max: 100, ticks: { color: c.text }, grid: { color: c.grid } },
+        y1: { position: "right", ticks: { color: c.tier1 }, grid: { display: false } },
+        x: { ticks: { color: c.text, maxTicksLimit: 10 }, grid: { display: false } },
+      },
+    },
+  });
+}
+
 // ---- Circle of Care ---------------------------------------------------------
 async function loadContacts() {
   let data;
@@ -573,6 +709,7 @@ async function loadEngineMode() {
 async function refresh() {
   await Promise.all([
     loadStatus(), loadTimeline(), loadEval(), loadInsights(), loadContacts(),
+    loadRelapse(), loadSeasonal(),
   ]);
 }
 
@@ -614,13 +751,19 @@ function wireEvents() {
     }
   });
 
-  // Seed + wipe
+  // Seed + wipe. Use the 'recurring' scenario (two episodes) so relapse
+  // fingerprinting has a past episode to match against.
   document.getElementById("seedBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("seedBtn");
+    btn.disabled = true;
+    btn.textContent = "Loading demo\u2026";
     await api("/seed", {
       method: "POST",
-      body: JSON.stringify({ scenario: "decline", days: 60 }),
+      body: JSON.stringify({ scenario: "recurring", days: 90 }),
     });
     await refresh();
+    btn.disabled = false;
+    btn.textContent = "Load demo";
   });
 
   document.getElementById("wipeBtn").addEventListener("click", async () => {
@@ -770,9 +913,27 @@ function numOrNull(id) {
 }
 
 // ---- Init -------------------------------------------------------------------
+// Optionally capture a coarse location for the seasonal-context feature. If the
+// user declines, the backend falls back to a labeled demo location.
+function initGeo() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      window.__auraGeo = {
+        lat: pos.coords.latitude.toFixed(2),
+        lon: pos.coords.longitude.toFixed(2),
+      };
+      loadSeasonal();
+    },
+    () => { /* declined -> demo location used */ },
+    { maximumAge: 3600000, timeout: 5000 }
+  );
+}
+
 initTheme();
 wireEvents();
 loadEngineMode();
 loadResources();
 loadAssessmentSchema();
+initGeo();
 refresh();

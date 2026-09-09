@@ -106,11 +106,13 @@ _STABLE = {
 }
 
 
-def suggest(tier: int, top_signals: list[dict], *, max_items: int = 2) -> list[dict]:
+def suggest(tier: int, top_signals: list[dict], *, max_items: int = 2,
+            history: list[dict] | None = None) -> list[dict]:
     """Return up to ``max_items`` micro-interventions for the current state.
 
     * tier 0  -> a single gentle 'maintain' affirmation
-    * tier 1+ -> actions targeting the top contributing signals
+    * tier 1+ -> actions targeting the top contributing signals, ranked and
+      annotated by what has actually worked for THIS user (Feature 3).
     """
     if tier <= 0 or not top_signals:
         return [dict(_STABLE)]
@@ -129,4 +131,60 @@ def suggest(tier: int, top_signals: list[dict], *, max_items: int = 2) -> list[d
     # Fallback so an elevated tier always offers at least one action.
     if not out:
         out.append({"key": "neg_sentiment", **_LIBRARY["neg_sentiment"]})
-    return out
+
+    return annotate_effectiveness(out, history)
+
+
+def effectiveness(history: list[dict] | None) -> dict[str, dict]:
+    """Aggregate mean index change per intervention (negative delta = helped)."""
+    stats: dict[str, list[float]] = {}
+    for row in history or []:
+        d = row.get("delta")
+        k = row.get("intervention_key")
+        if d is not None and k:
+            stats.setdefault(k, []).append(float(d))
+    return {
+        k: {"avg_delta": round(sum(v) / len(v), 1), "n": len(v)}
+        for k, v in stats.items()
+    }
+
+
+def annotate_effectiveness(items: list[dict],
+                           history: list[dict] | None) -> list[dict]:
+    """Attach measured personal effectiveness to each suggestion and re-rank so
+    the intervention that has helped most for this user comes first."""
+    eff = effectiveness(history)
+    for it in items:
+        e = eff.get(it["key"])
+        if e:
+            it["avg_effect"] = e["avg_delta"]
+            it["n_tried"] = e["n"]
+            if e["avg_delta"] <= -1 and e["n"] >= 2:
+                it["proven"] = True
+                it["effect_text"] = (
+                    f"Worked for you before: lowered your index by "
+                    f"~{abs(e['avg_delta']):.0f} pts on average "
+                    f"({e['n']}\u00d7)."
+                )
+    # Proven-for-you first, then bigger measured effect.
+    items.sort(key=lambda i: (not i.get("proven", False),
+                              i.get("avg_effect", 0.0)))
+    return items
+
+
+def best_proven(history: list[dict] | None) -> dict | None:
+    """The single most effective intervention this user has tried, if clear."""
+    eff = effectiveness(history)
+    candidates = {k: v for k, v in eff.items()
+                  if v["n"] >= 2 and v["avg_delta"] <= -1 and k in _LIBRARY}
+    if not candidates:
+        return None
+    key = min(candidates, key=lambda k: candidates[k]["avg_delta"])
+    e = candidates[key]
+    return {
+        "key": key, **_LIBRARY[key],
+        "avg_effect": e["avg_delta"], "n_tried": e["n"], "proven": True,
+        "effect_text": (f"Your most effective step: lowered your index by "
+                        f"~{abs(e['avg_delta']):.0f} pts on average "
+                        f"({e['n']}\u00d7)."),
+    }

@@ -67,6 +67,8 @@ SIGNALS: list[Signal] = [
            "More absolute words (\u201calways/never\u201d) than usual."),
     Signal("future_focus_ratio", "Future orientation", "low", 0.7, 0.06,
            "Writing shows less looking-ahead / planning than usual."),
+    Signal("word_count", "Journaling depth", "low", 0.9, 6.0,
+           "You've been writing noticeably less than usual (withdrawal)."),
     # --- Passive signals (wearable / phone) ---------------------------------
     Signal("steps", "Activity", "low", 0.9, 1000.0,
            "Daily movement (steps) has dropped below your usual level."),

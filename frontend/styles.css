@@ -443,6 +443,53 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 18px; line-height: 1;
 }
 
+/* ===== Engagement / withdrawal strip ===== */
+.engagement-strip {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 18px; padding: 12px 16px; border-radius: var(--radius-sm);
+  background: var(--surface-2); border: 1px solid var(--border);
+  font-size: 13.5px; color: var(--text);
+}
+.engagement-dot {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--tier0);
+  flex-shrink: 0;
+}
+.engagement-dot.warn { background: var(--tier2); }
+
+/* ===== Relapse fingerprinting ===== */
+.relapse-match {
+  background: var(--surface-2); border: 1px solid var(--tier2);
+  border-radius: var(--radius-sm); padding: 14px; margin-bottom: 10px;
+}
+.relapse-sim {
+  display: inline-block; font-weight: 700; font-size: 18px; color: var(--tier2);
+}
+.relapse-range { font-size: 12px; color: var(--text-secondary); }
+.relapse-helped {
+  margin-top: 8px; font-size: 12.5px; color: var(--text);
+  background: var(--surface); border: 1px dashed var(--border);
+  border-radius: 8px; padding: 8px;
+}
+
+/* ===== Seasonal context ===== */
+.seasonal-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.seasonal-corr { font-size: 30px; font-weight: 700; color: var(--accent); }
+.seasonal-corr-label { font-size: 12px; color: var(--text-secondary); }
+.seasonal-note { font-size: 11px; color: var(--text-secondary); margin-top: 6px; font-style: italic; }
+
+/* ===== Intervention effectiveness ===== */
+.intervention.proven { border-color: var(--tier0); background: rgba(34,197,94,0.08); }
+.intervention-effect {
+  font-size: 12px; color: var(--tier0); font-weight: 600; margin-top: 6px;
+}
+.intervention-try {
+  margin-top: 8px; font-size: 12px; padding: 5px 12px; border-radius: 8px;
+  background: var(--accent); color: #fff; border: none; cursor: pointer;
+  font-family: inherit; font-weight: 600;
+}
+.intervention-try:hover { opacity: 0.9; }
+.intervention-try:disabled { opacity: 0.5; cursor: default; }
+
 /* ===== Utility ===== */
 .hidden { display: none !important; }
 .empty-state { color: var(--text-secondary); font-style: italic; font-size: 14px; }

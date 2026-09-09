@@ -165,7 +165,39 @@
           </div>
         </div>
       </div>
+      <div class="engagement-strip" id="engagementStrip">
+        <span class="engagement-dot" id="engagementDot"></span>
+        <span id="engagementText">Withdrawal detection appears once there's enough history.</span>
+      </div>
     </section>
+
+    <!-- Relapse fingerprinting + Seasonal context -->
+    <div class="charts-row">
+      <section class="card">
+        <div class="card-header">
+          <h2>Relapse Fingerprinting</h2>
+          <span class="badge">DTW pattern match</span>
+        </div>
+        <p class="chart-hint">Does your recent 14-day pattern resemble a decline you've been through before?</p>
+        <div id="relapsePanel">
+          <p class="empty-state">Comparing your recent window to past episodes\u2026</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Seasonal Context</h2>
+          <span class="badge">Daylight</span>
+        </div>
+        <p class="chart-hint">Is your index linked to daylight hours? Naming a seasonal dip can reduce self-blame.</p>
+        <div id="seasonalPanel">
+          <p class="empty-state">Correlating your index with local daylight\u2026</p>
+        </div>
+        <div class="chart-wrapper insight-chart hidden" id="seasonalChartWrap">
+          <canvas id="seasonalChart"></canvas>
+        </div>
+      </section>
+    </div>
 
     <!-- Bottom row -->
     <div class="bottom-row">
@@ -231,10 +263,11 @@
         <div class="fit-sync">
           <button id="fitSyncBtn" class="btn btn-google">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-            Sync Google Fit
+            Sync activity data (demo)
           </button>
           <span class="form-status" id="fitStatus"></span>
         </div>
+        <p class="data-info">Demo uses simulated wearable data. Real Google&nbsp;Fit / Fitbit needs OAuth setup &mdash; see README.</p>
       </section>
 
       <!-- Data & Privacy -->
@@ -248,7 +281,7 @@
           only to compute the signals shown here.
         </p>
         <div class="btn-group">
-          <button id="seedBtn" class="btn btn-secondary">Load 60-day demo</button>
+          <button id="seedBtn" class="btn btn-secondary">Load demo</button>
           <button id="exportBtn" class="btn btn-secondary">Export my data</button>
           <button id="wipeBtn" class="btn btn-danger">Delete all my data</button>
         </div>

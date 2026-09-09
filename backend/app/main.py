@@ -15,31 +15,41 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
+from . import engagement as engagement_mod
 from .analysis import compute_timeline
 from .assessments import INSTRUMENTS, RESPONSE_OPTIONS, score
 from .auth import get_current_user
 from .circle import build_nudge
 from .cloud_logging import logger, setup_logging
 from .config import settings
+from .environment import correlate as correlate_daylight
 from .evaluation import evaluate_stored
 from .features import extract_deterministic, extract_features
 from .insights import build_insights, forecast
-from .interventions import suggest
+from .interventions import best_proven, suggest
 from .passive import sync_passive
+from .relapse import find_similar_past_episodes
 from .safety import CRISIS_RESOURCES, detect_crisis
-from .schemas import AssessmentIn, ContactIn, EntryIn, FitSyncIn, SeedIn, StatusOut
+from .schemas import (
+    AssessmentIn, ContactIn, EntryIn, FitSyncIn, InterventionTryIn, SeedIn,
+    StatusOut,
+)
 from . import seed as seed_module
 
 # Dynamic DB backend selection
 if settings.firestore_enabled:
     from .firebase_db import (
         add_contact, delete_all, delete_contact, get_assessments, get_contacts,
-        get_entries, init_db, update_passive, upsert_assessment, upsert_entry,
+        get_entries, get_intervention_history, init_db, log_intervention,
+        resolve_pending_interventions, update_passive, upsert_assessment,
+        upsert_entry,
     )
 else:
     from .db import (
         add_contact, delete_all, delete_contact, get_assessments, get_contacts,
-        get_entries, init_db, update_passive, upsert_assessment, upsert_entry,
+        get_entries, get_intervention_history, init_db, log_intervention,
+        resolve_pending_interventions, update_passive, upsert_assessment,
+        upsert_entry,
     )
 
 api = APIRouter(prefix="/api")
@@ -52,8 +62,12 @@ def _status_payload(user_id: str) -> dict:
     timeline = result["timeline"]
 
     tier = summary.get("tier") or 0
-    summary["interventions"] = suggest(tier, summary.get("top_signals", []))
+    history = get_intervention_history(user_id)
+    summary["interventions"] = suggest(
+        tier, summary.get("top_signals", []), history=history)
+    summary["proven_intervention"] = best_proven(history)
     summary["forecast"] = forecast(timeline)
+    summary["engagement"] = engagement_mod.compute(entries)
 
     # Circle of Care nudge is opt-in and only relevant at higher tiers.
     if tier >= 2:
@@ -61,6 +75,11 @@ def _status_payload(user_id: str) -> dict:
     else:
         summary["circle_nudge"] = None
     return summary
+
+
+def _current_index(user_id: str) -> float | None:
+    entries = get_entries(user_id)
+    return compute_timeline(entries)["summary"].get("aura_index")
 
 
 @api.get("/health")
@@ -114,6 +133,11 @@ def create_entry(payload: EntryIn,
         active_minutes=payload.active_minutes,
         screen_time_min=payload.screen_time_min,
     )
+    # Close the loop on any recently-tried micro-intervention (Feature 3):
+    # this new check-in's index is the "after" measurement.
+    idx = _current_index(user_id)
+    if idx is not None:
+        resolve_pending_interventions(user_id, idx)
     return _status_payload(user_id)
 
 
@@ -147,6 +171,18 @@ def seed(payload: SeedIn,
             total=sc["total"],
             severity=sc["severity"],
             responses=None,
+        )
+    # Seed a plausible intervention-effectiveness history (Feature 3) so the
+    # "what works for you" panel is populated in the demo.
+    for iv in seed_module.generate_interventions(
+        scenario=payload.scenario, days=payload.days
+    ):
+        log_intervention(
+            user_id=user_id,
+            date=iv["date"],
+            intervention_key=iv["intervention_key"],
+            index_before=iv["index_before"],
+            index_after=iv["index_after"],
         )
     logger.info(f"Demo seeded for user={user_id}")
     return _status_payload(user_id)
@@ -210,7 +246,77 @@ def insights(user_id: str = Depends(get_current_user)) -> dict:
     """Explainable AI: weekly summary, recurring cycles, and trend forecast."""
     entries = get_entries(user_id)
     timeline = compute_timeline(entries)["timeline"]
-    return build_insights(timeline)
+    out = build_insights(timeline)
+    out["engagement"] = engagement_mod.compute(entries)
+    return out
+
+
+@api.get("/engagement")
+def engagement(user_id: str = Depends(get_current_user)) -> dict:
+    """Writing-withdrawal detection: are entries getting shorter / less often?"""
+    return engagement_mod.compute(get_entries(user_id))
+
+
+@api.get("/relapse")
+def relapse(user_id: str = Depends(get_current_user)) -> dict:
+    """Relapse fingerprinting: DTW similarity of the recent window to past
+    decline episodes, enriched with what helped during those episodes."""
+    entries = get_entries(user_id)
+    timeline = compute_timeline(entries)["timeline"]
+    result = find_similar_past_episodes(timeline)
+    # Enrich each match with the most effective intervention tried around then.
+    history = get_intervention_history(user_id)
+    for m in result.get("matches", []):
+        m["what_helped"] = _what_helped(history, m["start"], m["end"])
+    return result
+
+
+def _what_helped(history: list[dict], start: str, end: str) -> dict | None:
+    """Most effective intervention logged within/after an episode window."""
+    from .interventions import _LIBRARY
+    best = None
+    for row in history:
+        d = row.get("date", "")
+        delta = row.get("delta")
+        if delta is None or d < start:
+            continue
+        key = row.get("intervention_key")
+        if key not in _LIBRARY:
+            continue
+        if best is None or delta < best[1]:
+            best = (key, delta)
+    if best and best[1] <= -1:
+        key = best[0]
+        return {"key": key, "title": _LIBRARY[key]["title"],
+                "action": _LIBRARY[key]["action"],
+                "avg_effect": round(best[1], 1)}
+    return None
+
+
+@api.post("/interventions/try")
+def try_intervention(payload: InterventionTryIn,
+                     user_id: str = Depends(get_current_user)) -> dict:
+    """Record that the user is trying an intervention now. The NEXT check-in's
+    Aura Index becomes the 'after' measurement (Feature 3 effectiveness loop)."""
+    idx = _current_index(user_id)
+    log_intervention(
+        user_id=user_id,
+        date=date_cls.today().isoformat(),
+        intervention_key=payload.key,
+        index_before=idx,
+    )
+    logger.info(f"Intervention tried user={user_id} key={payload.key}")
+    return {"logged": True, "key": payload.key, "index_before": idx,
+            "note": "Nice. Your next check-in will measure whether it helped."}
+
+
+@api.get("/environment")
+def environment(lat: float | None = None, lon: float | None = None,
+                user_id: str = Depends(get_current_user)) -> dict:
+    """Seasonal context: correlate the Aura Index with local daylight hours."""
+    entries = get_entries(user_id)
+    timeline = compute_timeline(entries)["timeline"]
+    return correlate_daylight(timeline, lat=lat, lon=lon)
 
 
 @api.post("/fit/sync")

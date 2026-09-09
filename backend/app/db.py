@@ -53,6 +53,17 @@ CREATE TABLE IF NOT EXISTS contacts (
     notify_tier   INTEGER NOT NULL DEFAULT 3,
     created_at    TEXT    NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS intervention_log (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       TEXT    NOT NULL,
+    date          TEXT    NOT NULL,
+    intervention_key TEXT NOT NULL,
+    index_before  REAL,
+    index_after   REAL,               -- null until resolved on next check-in
+    delta         REAL,               -- index_after - index_before (negative = helped)
+    created_at    TEXT    NOT NULL
+);
 """
 
 # Columns added after the initial release; ALTER TABLE for older DB files.
@@ -269,9 +280,55 @@ def delete_contact(user_id: str, contact_id: int) -> int:
         return cur.rowcount
 
 
+# --- Intervention effectiveness log -----------------------------------------
+def log_intervention(*, user_id: str, date: str, intervention_key: str,
+                     index_before: float | None,
+                     index_after: float | None = None) -> int:
+    delta = None
+    if index_before is not None and index_after is not None:
+        delta = index_after - index_before
+    with get_conn() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO intervention_log
+                (user_id, date, intervention_key, index_before, index_after,
+                 delta, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (user_id, date, intervention_key, index_before, index_after, delta,
+             datetime.now(timezone.utc).isoformat()),
+        )
+        return cur.lastrowid
+
+
+def resolve_pending_interventions(user_id: str, index_after: float) -> int:
+    """Fill in the outcome for any tried-but-unresolved interventions."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            """
+            UPDATE intervention_log
+            SET index_after = ?, delta = ? - index_before
+            WHERE user_id = ? AND index_after IS NULL AND index_before IS NOT NULL
+            """,
+            (index_after, index_after, user_id),
+        )
+        return cur.rowcount
+
+
+def get_intervention_history(user_id: str) -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT date, intervention_key, index_before, index_after, delta "
+            "FROM intervention_log WHERE user_id = ? ORDER BY date ASC",
+            (user_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def delete_all(user_id: str) -> int:
     with get_conn() as conn:
         cur = conn.execute("DELETE FROM entries WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM assessments WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM contacts WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM intervention_log WHERE user_id = ?", (user_id,))
         return cur.rowcount

@@ -37,9 +37,14 @@ class EntryIn(BaseModel):
 class SeedIn(BaseModel):
     scenario: str = Field(
         default="decline",
-        description="'decline' (stable then gradual drift) or 'stable'.",
+        description="'decline' (stable then gradual drift), 'recurring' (two "
+                    "episodes, for relapse fingerprinting), or 'stable'.",
     )
     days: int = Field(default=60, ge=14, le=180)
+
+
+class InterventionTryIn(BaseModel):
+    key: str = Field(description="Intervention signal key being tried now.")
 
 
 class AssessmentIn(BaseModel):
@@ -106,6 +111,8 @@ class StatusOut(BaseModel):
     latest_date: str | None
     entry_count: int
     reflection: str | None = None
-    interventions: list[Intervention] = []
+    interventions: list[dict] = []
+    proven_intervention: dict | None = None
     forecast: dict | None = None
     circle_nudge: dict | None = None
+    engagement: dict | None = None

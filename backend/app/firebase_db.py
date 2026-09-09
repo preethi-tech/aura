@@ -187,10 +187,55 @@ def delete_contact(user_id: str, contact_id) -> int:
     return 0
 
 
+# --- Intervention effectiveness log -----------------------------------------
+def log_intervention(*, user_id: str, date: str, intervention_key: str,
+                     index_before: float | None,
+                     index_after: float | None = None) -> str:
+    db = _get_db()
+    coll = db.collection("users").document(user_id).collection("intervention_log")
+    doc_ref = coll.document()
+    delta = None
+    if index_before is not None and index_after is not None:
+        delta = index_after - index_before
+    doc_ref.set({
+        "date": date, "intervention_key": intervention_key,
+        "index_before": index_before, "index_after": index_after,
+        "delta": delta,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return doc_ref.id
+
+
+def resolve_pending_interventions(user_id: str, index_after: float) -> int:
+    db = _get_db()
+    coll = db.collection("users").document(user_id).collection("intervention_log")
+    n = 0
+    for doc in coll.stream():
+        d = doc.to_dict()
+        if d.get("index_after") is None and d.get("index_before") is not None:
+            doc.reference.set({
+                "index_after": index_after,
+                "delta": index_after - d["index_before"],
+            }, merge=True)
+            n += 1
+    return n
+
+
+def get_intervention_history(user_id: str) -> list[dict]:
+    db = _get_db()
+    docs = (
+        db.collection("users").document(user_id)
+        .collection("intervention_log").stream()
+    )
+    rows = [doc.to_dict() for doc in docs]
+    rows.sort(key=lambda r: r.get("date", ""))
+    return rows
+
+
 def delete_all(user_id: str) -> int:
     db = _get_db()
     count = 0
-    for coll_name in ("entries", "assessments", "contacts"):
+    for coll_name in ("entries", "assessments", "contacts", "intervention_log"):
         docs = db.collection("users").document(user_id).collection(coll_name).stream()
         for doc in docs:
             doc.reference.delete()

@@ -64,6 +64,37 @@ These build on the core engine and are all optional / privacy-preserving:
 Bonus: a transparent **7-day trend forecast** ("if the current trend
 continues…") and **one-tap data export** (JSON).
 
+### Advanced signals & self-comparison (latest)
+
+5. **Relapse Fingerprinting** (`relapse.py`). Temporal **pattern matching**
+   (Dynamic Time Warping, pure stdlib) that compares the *shape* of your recent
+   14-day window to previously-flagged decline **episodes** — "your last 14 days
+   look 78% similar to your episode in March, when reaching out helped." Shapes
+   are min-max normalised so a mild and a severe episode with the same
+   trajectory still match. Try it with the `recurring` demo scenario.
+6. **Engagement / Withdrawal Detection** (`engagement.py`). Scores the *act* of
+   journaling (shorter entries, fewer check-ins, lower lexical diversity), not
+   its content — catching the withdrawal phase that sentiment-only systems miss
+   because a struggling person often goes *quiet* before writing anything
+   negative. `word_count` is also fused into the Aura Index.
+7. **Personalized Intervention Effectiveness Loop** (`interventions.py`). A
+   lightweight on-your-own-data A/B loop: tapping "I'll try this" logs the
+   current index; your next check-in measures the change, and future
+   suggestions are re-ranked by **what has actually worked for you**
+   ("texting a friend lowered your index by ~8 pts on average").
+8. **Seasonal / Daylight Correlation** (`environment.py`). Correlates your index
+   with **free public daylight data** (Open-Meteo — no API key) so a seasonal
+   dip can be *named* rather than mistaken for personal failure. Location is
+   optional/coarse; degrades gracefully offline.
+
+> **Device sync note.** The "Sync activity data" button uses a **realistic
+> simulator** by default (clearly labeled *demo*). Real **Google Fit** is
+> scaffolded in `passive.py` (`fetch_google_fit`, needs an OAuth2 access token).
+> **Fitbit** is a separate provider (`api.fitbit.com`, its own OAuth2) and is
+> *not* wired up — connecting a real mobile Fitbit requires registering an app
+> at `dev.fitbit.com`, adding your Cloud Run URL as an OAuth redirect, and
+> passing the token to `/api/fit/sync`.
+
 ## Architecture
 
 ```
@@ -152,6 +183,10 @@ cp backend/.env.example backend/.env
 | POST   | `/api/contacts` | Add a trusted contact (opt-in)                     |
 | DELETE | `/api/contacts/{id}` | Remove a trusted contact                      |
 | GET    | `/api/export`   | Export all your data (entries, assessments, contacts) |
+| GET    | `/api/relapse`  | DTW similarity of recent window vs past episodes   |
+| GET    | `/api/engagement` | Writing-withdrawal (engagement decline) readout  |
+| POST   | `/api/interventions/try` | Log a tried intervention (effectiveness loop) |
+| GET    | `/api/environment` | Aura Index vs local daylight correlation (`?lat=&lon=`) |
 
 Example:
 ```bash
@@ -187,9 +222,10 @@ cd backend && python -m app.evaluation   # prints metrics for the stored user
 ```bash
 cd backend
 pip install -r requirements-dev.txt
-python -m pytest tests -q                 # 65 tests: features, safety, engine,
+python -m pytest tests -q                 # 88 tests: features, safety, engine,
                                           # assessments, evaluation, API, passive
-                                          # signals, insights, interventions, circle
+                                          # signals, insights, interventions, circle,
+                                          # engagement, relapse, effectiveness, environment
 ```
 
 ## Docs
@@ -261,14 +297,17 @@ aura/
       analysis.py     baselines, trend fusion, tiers, explanations
       passive.py      Google Fit + phone passive-signal integration
       insights.py     weekly summary, cycle detection, forecast (Gemini polish)
-      interventions.py evidence-based micro-actions
+      interventions.py evidence-based micro-actions + effectiveness loop
+      engagement.py   writing-withdrawal (engagement decline) detection
+      relapse.py      DTW relapse fingerprinting vs past episodes
+      environment.py  seasonal daylight correlation (Open-Meteo)
       circle.py       opt-in Circle-of-Care nudges
       safety.py       crisis detection + resources
       assessments.py  PHQ-9 / GAD-7 scoring
       evaluation.py   correlation, lead time, precision/recall (+ CLI)
-      seed.py         synthetic demo generator (+ ground-truth scores)
+      seed.py         synthetic demo generator (decline/recurring/stable)
       main.py         FastAPI app + static hosting
-    tests/            pytest suite (65 tests)
+    tests/            pytest suite (88 tests)
     requirements.txt · requirements-dev.txt · .env.example
   frontend/
     index.html · styles.css · app.js
