@@ -280,13 +280,13 @@ async function loadTimeline() {
     `${t.length} check-in(s) stored.`;
 }
 
-function threshold(labels, value, color) {
+function threshold(labels, value, color, label) {
   return {
-    label: "",
+    label: label,
     data: labels.map(() => value),
     borderColor: color,
-    borderWidth: 1,
-    borderDash: [4, 4],
+    borderWidth: 2,
+    borderDash: [6, 4],
     pointRadius: 0,
     fill: false,
     tension: 0,
@@ -310,20 +310,31 @@ function renderAuraChart(labels, t) {
           borderColor: c.accent,
           backgroundColor: c.accent + "18",
           pointBackgroundColor: pointColors,
-          pointRadius: 2.5,
+          pointRadius: 5,
+          pointHoverRadius: 7,
           borderWidth: 2,
           fill: true,
           tension: 0.3,
         },
-        threshold(labels, 25, c.tier0),
-        threshold(labels, 50, c.tier1),
-        threshold(labels, 75, c.tier3),
+        threshold(labels, 25, c.tier0, "Tier 1 (Notice)"),
+        threshold(labels, 50, c.tier1, "Tier 2 (Connect)"),
+        threshold(labels, 75, c.tier3, "Tier 3 (Reach out)"),
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: {
+          display: true,
+          position: "bottom",
+          labels: {
+            color: c.text,
+            usePointStyle: true,
+            pointStyle: "line",
+          },
+        },
+      },
       scales: {
         y: { min: 0, max: 100, ticks: { color: c.text }, grid: { color: c.grid } },
         x: { ticks: { color: c.text, maxTicksLimit: 12 }, grid: { display: false } },
