@@ -284,8 +284,8 @@ async function loadTimeline() {
   renderAuraChart(labels, t);
   renderSignalsChart(labels, t);
 
-  document.getElementById("dataInfo").textContent =
-    `${t.length} check-in(s) stored.`;
+  const infoEl = document.getElementById("dataInfo");
+  if (infoEl) infoEl.textContent = `${t.length} check-in(s) stored.`;
 }
 
 function threshold(labels, value, color, label) {
