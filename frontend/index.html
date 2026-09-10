@@ -109,6 +109,15 @@
           </div>
           <div class="tier-badge" id="tierBadge">No data yet</div>
           <p class="tier-message" id="tierMessage">Add a check-in or load the demo timeline to begin.</p>
+          
+          <div class="demo-actions" id="demoActions">
+            <button id="seedBtn" class="btn btn-primary">Load demo</button>
+            <button id="fitSyncBtn" class="btn btn-google">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Sync activity
+            </button>
+            <span class="form-status" id="fitStatus"></span>
+          </div>
 
           <div class="forecast-chip hidden" id="forecastChip">
             <span class="forecast-icon" id="forecastIcon">&#8599;</span>
@@ -160,17 +169,6 @@
             </div>
           </section>
         </div>
-      </div>
-
-      <!-- Quick actions bar -->
-      <div class="quick-actions">
-        <button id="seedBtn" class="btn btn-secondary">Load demo</button>
-        <button id="fitSyncBtn" class="btn btn-google">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-          Sync activity data (demo)
-        </button>
-        <span class="form-status" id="fitStatus"></span>
-        <span class="form-status" id="dataInfo"></span>
       </div>
     </div>
 
